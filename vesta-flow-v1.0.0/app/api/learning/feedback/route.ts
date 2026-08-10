@@ -1,0 +1,2 @@
+import {NextRequest,NextResponse} from 'next/server';
+export async function POST(req:NextRequest){const url=process.env.VESTA_LEARNING_API_URL?.replace(/\/$/,'');if(!url)return NextResponse.json({ok:false,error:'Learning API not configured'},{status:503});const body=await req.json();const r=await fetch(`${url}/v1/feedback`,{method:'POST',headers:{'content-type':'application/json',...(process.env.VESTA_LEARNING_API_KEY?{authorization:`Bearer ${process.env.VESTA_LEARNING_API_KEY}`}:{})},body:JSON.stringify(body)});return NextResponse.json(await r.json(),{status:r.status})}

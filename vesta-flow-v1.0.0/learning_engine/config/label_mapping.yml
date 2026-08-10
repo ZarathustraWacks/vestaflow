@@ -1,0 +1,23 @@
+version: 2
+# Approved from the Vesta Follow Up Boss SOP and listing-process review.
+positive_stages:
+  appointment30d: [Appointment Set, Appointment Met]
+  client90d: [Showing Homes, Submitting Offers, Listing Agreement, Active Listing, Under Contract]
+  closing180d: [Closed, Sold]
+negative_stages:
+  attrition30d: [Trash, Invalid, Spam, Lost, Do Not Contact]
+reactivation_event_types: [Website Visit, Viewed Property, Saved Property, Property Inquiry, Seller Inquiry, Registration]
+contact_event_types: [Call, Text Message, Email, Note]
+appointment_event_types: [Appointment, Showing, Listing Appointment, Buyer Appointment]
+closing_event_types: [Closing, Closed, Sold]
+ignored_sources: [Test, Internal]
+invalid_tags: [spam, duplicate, test, invalid]
+# A prediction snapshot can only use events at or before snapshot_at.
+snapshot_days_after_creation: [0, 1, 3, 7, 14, 30, 60, 90, 180]
+horizons_days:
+  contact7d: 7
+  appointment30d: 30
+  client90d: 90
+  closing180d: 180
+  attrition30d: 30
+  reactivation30d: 30

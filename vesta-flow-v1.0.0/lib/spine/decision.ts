@@ -1,0 +1,21 @@
+import { NormalizedLead } from '@/lib/domain/types';
+
+export type DecisionType='assign'|'contact'|'task'|'broker-review'|'reengage'|'continue'|'human-review';
+export interface LeadDecision {type:DecisionType;label:string;urgency:'Immediate'|'Today'|'This week'|'Monitor';rationale:string;consequence:string;matchedRule:string;evidenceQuality:'High'|'Medium'|'Low';dataCompleteness:number;}
+const daysSince=(value:string|null)=>value?Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/86400000)):99999;
+
+export function decideLead(lead:Pick<NormalizedLead,'assignedUserId'|'assignedUserName'|'ageBand'|'lastCommunicationAt'|'lastActivityAt'|'riskLevel'|'governanceScore'|'stage'|'leadLane'|'cadenceStatus'|'overdueTaskCount'|'responseSlaStatus'>):LeadDecision{
+ const activityDays=daysSince(lead.lastActivityAt),noOwner=lead.assignedUserId===null;
+ const completeness=Math.round(100*[lead.assignedUserName,lead.lastActivityAt,lead.lastCommunicationAt,lead.stage&&!['','Unknown'].includes(lead.stage),!['candidate-rental','needs-classification'].includes(lead.leadLane)].filter(Boolean).length/5);
+ const evidenceQuality:LeadDecision['evidenceQuality']=completeness>=80?'High':completeness>=50?'Medium':'Low';
+ const result=(matchedRule:string,value:Omit<LeadDecision,'matchedRule'|'evidenceQuality'|'dataCompleteness'>):LeadDecision=>({...value,matchedRule,evidenceQuality,dataCompleteness:completeness});
+ if(['candidate-rental','needs-classification'].includes(lead.leadLane))return result('classification.unresolved',{type:'human-review',label:'Confirm lead classification',urgency:'Today',rationale:'The available FUB signals do not establish one approved operating lane.',consequence:'The wrong buyer/seller or rental workflow could be applied.'});
+ if(noOwner)return result('owner.unresolved',{type:'assign',label:'Assign immediately',urgency:lead.ageBand==='Fresh'?'Immediate':'Today',rationale:'No accountable owner is visible for this lead.',consequence:'The record can continue aging without anyone responsible for it.'});
+ if(lead.responseSlaStatus==='pending'||lead.responseSlaStatus==='breached')return result('response.hand-raise-sla',{type:'contact',label:'Respond to hand raise',urgency:'Immediate',rationale:lead.responseSlaStatus==='pending'?'An active hand raise is inside the one-minute response window.':'The last active hand raise missed the one-minute response standard.',consequence:'High-intent demand may convert with another brokerage.'});
+ if(activityDays<=7&&lead.cadenceStatus==='overdue')return result('cadence.active-overdue',{type:'contact',label:'Contact today',urgency:'Immediate',rationale:'Recent activity is present and the approved cadence is overdue.',consequence:'Active intent may decay without timely agent follow-up.'});
+ if(lead.cadenceStatus==='overdue'||lead.cadenceStatus==='due')return result('cadence.sop-due',{type:'contact',label:'Restore follow-up cadence',urgency:lead.cadenceStatus==='overdue'?'Today':'This week',rationale:'The lead is due under the approved Smart List cadence.',consequence:'The lead can fall outside its required operating rhythm.'});
+ if(lead.overdueTaskCount>0)return result('task.overdue-one-off',{type:'task',label:'Clear overdue task',urgency:'Today',rationale:`${lead.overdueTaskCount} overdue one-off task(s) are visible.`,consequence:'A specifically committed action remains incomplete.'});
+ if(lead.ageBand!=='Fresh'&&lead.governanceScore<55)return result('recovery.aged-low-governance',{type:'reengage',label:'Review for recovery',urgency:'This week',rationale:'The record is aged and governance is weak enough to justify a recovery decision.',consequence:'Potential pipeline and referral value remains stranded in the database.'});
+ if(lead.riskLevel==='Critical'||lead.riskLevel==='High')return result('risk.management-review',{type:'broker-review',label:'Broker review',urgency:'Today',rationale:'Multiple governance failures require management judgment.',consequence:'Unresolved ownership, cadence, or disposition gaps can compound.'});
+ return result('plan.continue',{type:'continue',label:'Continue current plan',urgency:'Monitor',rationale:'No urgent governance exception is currently visible.',consequence:'Maintain the approved cadence and watch for new engagement signals.'});
+}
