@@ -1,2 +1,0 @@
-import { NextRequest,NextResponse } from 'next/server';import { getLeadIntelligence } from '@/lib/fub/service';import { FubError } from '@/lib/fub/errors';
-export async function GET(_r:NextRequest,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;return NextResponse.json(await getLeadIntelligence(id))}catch(e){const x=e as FubError;return NextResponse.json({ok:false,error:x.message,status:x.status,details:x.details},{status:x.status||500})}}
