@@ -1,3 +1,4 @@
+/** Audit appointment records against required operational process fields. */
 const present=(value:unknown)=>value!==undefined&&value!==null&&value!=='';
 export function auditAppointments(items:any[]){
  const findings=items.map(item=>{

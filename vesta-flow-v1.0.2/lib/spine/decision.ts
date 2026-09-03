@@ -1,9 +1,12 @@
+/** Produce one explainable management action from normalized governance facts. */
 import { NormalizedLead } from '@/lib/domain/types';
 
 export type DecisionType='assign'|'contact'|'task'|'broker-review'|'reengage'|'continue'|'human-review';
 export interface LeadDecision {type:DecisionType;label:string;urgency:'Immediate'|'Today'|'This week'|'Monitor';rationale:string;consequence:string;matchedRule:string;evidenceQuality:'High'|'Medium'|'Low';dataCompleteness:number;}
 const daysSince=(value:string|null)=>value?Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/86400000)):99999;
 
+// Rule order is intentional: classification and ownership blockers precede
+// cadence, recovery, and general risk review so later heuristics cannot mask them.
 export function decideLead(lead:Pick<NormalizedLead,'assignedUserId'|'assignedUserName'|'ageBand'|'lastCommunicationAt'|'lastActivityAt'|'riskLevel'|'governanceScore'|'stage'|'leadLane'|'cadenceStatus'|'overdueTaskCount'|'responseSlaStatus'>):LeadDecision{
  const activityDays=daysSince(lead.lastActivityAt),noOwner=lead.assignedUserId===null;
  const completeness=Math.round(100*[lead.assignedUserName,lead.lastActivityAt,lead.lastCommunicationAt,lead.stage&&!['','Unknown'].includes(lead.stage),!['candidate-rental','needs-classification'].includes(lead.leadLane)].filter(Boolean).length/5);
@@ -11,7 +14,7 @@ export function decideLead(lead:Pick<NormalizedLead,'assignedUserId'|'assignedUs
  const result=(matchedRule:string,value:Omit<LeadDecision,'matchedRule'|'evidenceQuality'|'dataCompleteness'>):LeadDecision=>({...value,matchedRule,evidenceQuality,dataCompleteness:completeness});
  if(['candidate-rental','needs-classification'].includes(lead.leadLane))return result('classification.unresolved',{type:'human-review',label:'Confirm lead classification',urgency:'Today',rationale:'The available FUB signals do not establish one approved operating lane.',consequence:'The wrong buyer/seller or rental workflow could be applied.'});
  if(noOwner)return result('owner.unresolved',{type:'assign',label:'Assign immediately',urgency:lead.ageBand==='Fresh'?'Immediate':'Today',rationale:'No accountable owner is visible for this lead.',consequence:'The record can continue aging without anyone responsible for it.'});
- if(lead.responseSlaStatus==='pending'||lead.responseSlaStatus==='breached')return result('response.hand-raise-sla',{type:'contact',label:'Respond to hand raise',urgency:'Immediate',rationale:lead.responseSlaStatus==='pending'?'An active hand raise is inside the one-minute response window.':'The last active hand raise missed the one-minute response standard.',consequence:'High-intent demand may convert with another brokerage.'});
+ if(lead.responseSlaStatus==='pending'||lead.responseSlaStatus==='breached')return result('response.first-contact-four-hour',{type:'contact',label:'Respond to hand raise',urgency:'Immediate',rationale:lead.responseSlaStatus==='pending'?'An active hand raise is inside the four-hour first-contact window.':'The last active hand raise missed the four-hour first-contact standard.',consequence:'High-intent demand may convert with another brokerage.'});
  if(activityDays<=7&&lead.cadenceStatus==='overdue')return result('cadence.active-overdue',{type:'contact',label:'Contact today',urgency:'Immediate',rationale:'Recent activity is present and the approved cadence is overdue.',consequence:'Active intent may decay without timely agent follow-up.'});
  if(lead.cadenceStatus==='overdue'||lead.cadenceStatus==='due')return result('cadence.sop-due',{type:'contact',label:'Restore follow-up cadence',urgency:lead.cadenceStatus==='overdue'?'Today':'This week',rationale:'The lead is due under the approved Smart List cadence.',consequence:'The lead can fall outside its required operating rhythm.'});
  if(lead.overdueTaskCount>0)return result('task.overdue-one-off',{type:'task',label:'Clear overdue task',urgency:'Today',rationale:`${lead.overdueTaskCount} overdue one-off task(s) are visible.`,consequence:'A specifically committed action remains incomplete.'});

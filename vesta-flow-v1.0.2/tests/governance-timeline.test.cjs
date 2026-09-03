@@ -19,12 +19,14 @@ require.extensions['.ts']=function(module,filename){
 
 const {classifyBusinessSegment,normalizePersonBase,normalizeTask,normalizeUser}=require('../lib/fub/normalize.ts');
 const {enrichLead}=require('../lib/spine/governance.ts');
+const {addCentralBusinessMinutes}=require('../lib/policy/business-time.ts');
 const {buildTimeline}=require('../lib/spine/timeline.ts');
 const {auditAppointments}=require('../lib/policy/appointments.ts');
 const {listingProcess}=require('../lib/integrations/listing.ts');
 const {buildFlowQueue,buildManagementExceptions}=require('../lib/flow/engine.ts');
 const {discoverBrokers}=require('../lib/flow/brokers.ts');
 const {buildCompletionNote}=require('../lib/fub/writeback.ts');
+const {afternoonCandidates,dueRunKinds,morningCandidates,previousBusinessDate}=require('../lib/automation/critical.ts');
 
 const iso=(offsetDays)=>new Date(Date.now()+offsetDays*86400000).toISOString();
 const users=new Map([[7,normalizeUser({id:7,name:'Rental Agent',role:'Agent',status:'Active'})]]);
@@ -120,13 +122,27 @@ test('Apartments.com without a confirmed rental stage becomes a rental candidate
   assert.equal(lead.businessSegment,'needs-classification');
 });
 
-test('one-minute SLA applies only to a documented hand raise',()=>{
+test('four-business-hour first-contact clock applies only to a documented hand raise',()=>{
   const pending=enrichLead(person({lastInquiry:new Date(Date.now()-30000).toISOString(),lastCommunication:null}),[]);
-  const breached=enrichLead(person({lastInquiry:new Date(Date.now()-120000).toISOString(),lastCommunication:null}),[]);
+  const breached=enrichLead(person({lastInquiry:new Date(Date.now()-4*86400000).toISOString(),lastCommunication:null}),[]);
   const ordinary=enrichLead(person({lastInquiry:null,lastCommunication:null,stage:'Renter',tags:['Rental']}),[]);
   assert.equal(pending.responseSlaStatus,'pending');
   assert.equal(breached.responseSlaStatus,'breached');
   assert.equal(ordinary.responseSlaStatus,'not-applicable');
+  assert.equal(pending.operationalClocks.find(item=>item.key==='first-contact-attempt').policyStatus,'approved');
+});
+
+test('an on-time qualifying contact clears the first-contact clock',()=>{
+  const raised=new Date(Date.now()-2*3600000).toISOString();
+  const contacted=new Date(Date.now()-3600000).toISOString();
+  const lead=enrichLead(person({lastInquiry:raised,lastCommunication:contacted}),[]);
+  const clock=lead.operationalClocks.find(item=>item.key==='first-contact-attempt');
+  assert.equal(lead.responseSlaStatus,'met');
+  assert.equal(clock.status,'met');
+});
+
+test('business clock pauses outside Central working hours',()=>{
+  assert.equal(new Date(addCentralBusinessMinutes('2026-09-04T21:00:00Z',240)).toISOString(),'2026-09-07T17:00:00.000Z');
 });
 
 test('appointment audit detects missing client and reminder evidence',()=>{
@@ -160,20 +176,20 @@ test('timeline does not invent assignment-at-creation and retains completed task
 });
 
 test('completed flow item stays out until its intelligence snapshot changes',()=>{
-  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[]);
+  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[normalizeTask({id:91,personId:42,name:'Follow up',dueDateTime:iso(.2),isCompleted:false},users)]);
   const event={id:'complete-1',kind:'broker.complete',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,outcome:'Connected'};
   assert.equal(buildFlowQueue([lead],[event],7).length,0);
   assert.equal(buildFlowQueue([{...lead,decisionSnapshotId:'changed'}],[event],7).length,1);
 });
 
 test('future skip hides an item and an expired skip returns it',()=>{
-  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[]),base={id:'skip-1',kind:'broker.skip',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,reason:'Call later'};
+  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[normalizeTask({id:92,personId:42,name:'Follow up',dueDateTime:iso(.2),isCompleted:false},users)]),base={id:'skip-1',kind:'broker.skip',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,reason:'Call later'};
   assert.equal(buildFlowQueue([lead],[{...base,returnAt:iso(1)}],7).length,0);
   assert.equal(buildFlowQueue([lead],[{...base,returnAt:iso(-1)}],7).length,1);
 });
 
 test('pass creates management exception and reroute moves ownership',()=>{
-  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[]),pass={id:'pass-1',kind:'broker.pass',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,reason:'Capacity conflict'};
+  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[normalizeTask({id:93,personId:42,name:'Follow up',dueDateTime:iso(.2),isCompleted:false},users)]),pass={id:'pass-1',kind:'broker.pass',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,reason:'Capacity conflict'};
   const usersForFlow=[{id:7,name:'Rental Agent',role:'Agent',isActive:true},{id:8,name:'Next Broker',role:'Agent',isActive:true}];
   assert.equal(buildFlowQueue([lead],[pass],7).length,0);
   assert.equal(buildManagementExceptions([lead],[pass],usersForFlow).length,1);
@@ -206,4 +222,28 @@ test('FUB completion note is deterministic for safe retry deduplication',()=>{
 test('FUB completion deduplication key changes when the material outcome changes',()=>{
   const base={leadId:'42',decisionSnapshotId:'snapshot-a',actorUserId:7,actorName:'Rental Agent',recommendation:'Contact today',outcome:'Connected'};
   assert.notEqual(buildCompletionNote(base).syncKey,buildCompletionNote({...base,outcome:'No answer'}).syncKey);
+});
+
+test('critical dispatcher follows America Chicago time in daylight saving time',()=>{
+  assert.deepEqual(dueRunKinds(new Date('2026-08-18T14:00:00Z')),['morning-reroutes']);
+  assert.deepEqual(dueRunKinds(new Date('2026-08-18T19:30:00Z')),['morning-reroutes','afternoon-critical']);
+  assert.deepEqual(dueRunKinds(new Date('2026-08-18T18:30:00Z')),['morning-reroutes']);
+  assert.deepEqual(dueRunKinds(new Date('2026-08-18T13:59:00Z')),[]);
+});
+
+test('previous business day rolls Monday back to Friday',()=>{
+  assert.equal(previousBusinessDate('2026-08-17'),'2026-08-14');
+  assert.equal(previousBusinessDate('2026-08-18'),'2026-08-17');
+});
+
+test('afternoon critical digest includes only leads whose four-hour mark elapsed',()=>{
+  const now=new Date('2026-08-18T19:30:00Z'),base={id:1,name:'Lead',stage:'Lead',source:'Website',leadLane:'buyer',assignedUserName:'Agent',governanceScore:20,riskLevel:'Critical',responseSlaStatus:'breached',decision:{urgency:'Immediate',label:'Contact now',rationale:'No contact'}};
+  const candidates=afternoonCandidates([{...base,id:1,createdAt:'2026-08-18T14:00:00Z',lastCommunicationAt:null},{...base,id:2,createdAt:'2026-08-18T16:00:00Z',lastCommunicationAt:null},{...base,id:3,createdAt:'2026-08-18T14:00:00Z',lastCommunicationAt:'2026-08-18T15:00:00Z'}],now);
+  assert.deepEqual(candidates.map(x=>x.leadId),['1']);
+});
+
+test('morning reroute digest uses unresolved passes from prior noon-to-five window',()=>{
+  const lead={id:1,name:'Lead',stage:'Lead',source:'Website',leadLane:'buyer',governanceScore:20},passEvent={id:'p1',createdAt:'2026-08-17T17:00:00Z',reason:'Capacity',actorName:'Agent'};
+  const candidates=morningCandidates([{lead,passEvent,previousBroker:'Agent',recommendedBrokerName:'Next Agent'}],new Date('2026-08-18T14:00:00Z'));
+  assert.equal(candidates.length,1);assert.equal(candidates[0].suggestedOwnerName,'Next Agent');
 });

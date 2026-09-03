@@ -11,6 +11,10 @@ export interface FlowEvent {
  actorName:string;
  createdAt:string;
  recommendation:string;
+ recommendationShown?:string;
+ selectedAction?:string;
+ reportedAction?:string;
+ verificationStatus?:'reported'|'reported-note-readback'|'fub-event-verified'|'unverified';
  priority:string;
  outcome?:string;
  reason?:string;

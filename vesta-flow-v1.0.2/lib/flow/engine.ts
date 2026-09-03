@@ -13,7 +13,15 @@ function priorityScore(lead:any){
  const risk=({Critical:80,High:60,Medium:30,Healthy:0} as Record<string,number>)[lead.riskLevel]||0;
  const sla=lead.responseSlaStatus==='pending'?90:lead.responseSlaStatus==='breached'?75:0;
  const cadence=lead.cadenceStatus==='overdue'?50:lead.cadenceStatus==='due'?25:0;
- return urgency+risk+sla+cadence+(100-Number(lead.governanceScore||0));
+ const confirmation=(lead.operationalClocks||[]).some((item:any)=>item.key==='appointment-confirmation'&&['pending','breached'].includes(item.status))?110:0;
+ return urgency+risk+sla+cadence+confirmation+(100-Number(lead.governanceScore||0));
+}
+
+function actionable(lead:any,now=Date.now()){
+ if(lead.decision?.urgency&&lead.decision.urgency!=='Monitor')return true;
+ if(lead.overdueTaskCount>0||lead.taskRepairRecommended||['due','overdue'].includes(lead.cadenceStatus))return true;
+ const next=lead.nextActionAt?Date.parse(lead.nextActionAt):0;
+ return Boolean(next&&next<=now+24*60*60*1000);
 }
 
 function unresolvedPass(events:FlowEvent[]){
@@ -36,8 +44,8 @@ function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
 export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|null):FlowItem[]{
  const items:FlowItem[]=[];
  for(const lead of leads){
-  const history=leadEvents(events,String(lead.id)),owner=latestOwnership(lead,history);
-  if(owner.id!==brokerId||suppressed(lead,history))continue;
+ const history=leadEvents(events,String(lead.id)),owner=latestOwnership(lead,history);
+  if(owner.id!==brokerId||suppressed(lead,history)||!actionable(lead))continue;
   const score=priorityScore(lead),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
   items.push({id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:lead.decision?.urgency||'Monitor',recommendedAction:lead.decision?.label||lead.recommendedAction,rationale:lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
  }

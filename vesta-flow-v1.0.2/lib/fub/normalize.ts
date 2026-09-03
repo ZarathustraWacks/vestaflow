@@ -1,15 +1,50 @@
-import { NormalizedLead, NormalizedTask, NormalizedUser } from '@/lib/domain/types';
+/** Normalize variable FUB payload shapes and preserve classification evidence. */
+import { NormalizedAppointment, NormalizedLead, NormalizedTask, NormalizedUser } from '@/lib/domain/types';
 import { resolveLane } from '@/lib/policy/vesta';
 const arr=(v:unknown):any[]=>Array.isArray(v)?v:[];
 const dt=(v:unknown)=>typeof v==='string'&&v.trim()?v:null;
 const num=(v:unknown)=>typeof v==='number'?v:(typeof v==='string'&&v.trim()&&!Number.isNaN(Number(v))?Number(v):null);
 const text=(v:unknown)=>typeof v==='string'?v.trim():'';
 const bool=(v:unknown)=>v===true||v===1||(typeof v==='string'&&['true','1','yes'].includes(v.trim().toLowerCase()));
+type CommunicationSource='fub-last-communication'|'fub-contacted'|'outbound-email'|'outbound-text'|'email'|'text'|null;
+const validDate=(value:unknown):string|null=>{
+  if(typeof value==='string'&&value.trim()&&Number.isFinite(new Date(value).getTime()))return value;
+  if(!value||typeof value!=='object')return null;
+  const item=value as Record<string,unknown>,direction=text(item.direction??item.type).toLowerCase();
+  if(['incoming','inbound','received'].includes(direction))return null;
+  for(const key of ['sentAt','created','createdAt','occurredAt','timestamp','date','updatedAt']){
+    const candidate=item[key];
+    if(typeof candidate==='string'&&candidate.trim()&&Number.isFinite(new Date(candidate).getTime()))return candidate;
+  }
+  return null;
+};
+/**
+ * Resolve the newest outbound communication timestamp exposed on a FUB person.
+ * `contacted` is retained because FUB commonly advances it after logged email,
+ * text, and call activity even when `lastCommunication` is absent or stale.
+ */
+export function resolveLastCommunication(p:any):{at:string|null;source:CommunicationSource}{
+  const candidates:{source:Exclude<CommunicationSource,null>;value:unknown}[]=[
+    {source:'fub-last-communication',value:p.lastCommunication??p.lastCommunicationAt},
+    {source:'fub-contacted',value:p.contacted},
+    {source:'outbound-email',value:p.lastEmailSentAt??p.lastOutboundEmailAt??p.lastSentEmail??p.emailLastSentAt??p.communication?.lastEmailSentAt},
+    {source:'outbound-text',value:p.lastTextSentAt??p.lastOutboundTextAt??p.lastSentText??p.textLastSentAt??p.lastSmsSentAt??p.communication?.lastTextSentAt},
+    {source:'email',value:p.lastEmailAt??p.lastEmailDate??p.lastEmail??p.communication?.lastEmailAt},
+    {source:'text',value:p.lastTextAt??p.lastTextDate??p.lastText??p.lastSmsAt??p.communication?.lastTextAt},
+  ];
+  const resolved=candidates.map(candidate=>({...candidate,at:validDate(candidate.value)})).filter(candidate=>candidate.at!==null).sort((a,b)=>new Date(b.at!).getTime()-new Date(a.at!).getTime())[0];
+  return resolved?{at:resolved.at!,source:resolved.source}:{at:null,source:null};
+}
 const DEFAULT_RENTAL_MARKERS=['rent','rental','rentals','renter','renters','tenant','tenants','lease','leasing','apartment','apartments'];
 // Account-specific markers extend the safe defaults. They must not replace them,
 // otherwise an older Vercel value can silently disable a newly supported source.
 const rentalMarkers=()=>new Set([...DEFAULT_RENTAL_MARKERS,...(process.env.VESTA_RENTAL_MARKERS||'').split(',')].map(x=>x.trim().toLowerCase()).filter(Boolean));
 const tokens=(value:unknown)=>text(value).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+/**
+ * Classify operating lanes from explicit evidence. Predictive tags never
+ * silently override observed intent, and contradictory rental/seller evidence
+ * is deliberately routed to human review.
+ */
 export function classifyBusinessSegment(p:any):{segment:'buyer-seller'|'rental'|'needs-classification';reason:string;evidence:string[]}{
   const source=text(p.source).toLowerCase();
   const candidates:{field:string;value:unknown}[]=[];
@@ -49,6 +84,13 @@ export function normalizePersonBase(p:any,userMap?:Map<number,NormalizedUser>):O
   const assigned=resolveAssignment(p,userMap);
   const tags=arr(p.tags).map(x=>typeof x==='string'?x:text(x?.name??x?.value??x?.tag??x?.label)).filter(Boolean),stage=text(p.stage)||'Unknown',source=text(p.source)||'Unknown';const lane=resolveLane({stage,source,tags});
   const businessSegment=lane.lane==='renter'?'rental':lane.lane==='candidate-rental'||lane.lane==='needs-classification'?'needs-classification':'buyer-seller';
-  return {id:p.id,name,stage,source,businessSegment,businessSegmentReason:lane.reason,businessSegmentEvidence:lane.evidence,leadLane:lane.lane,timeframeId:num(p.timeframeId),timeframeStatus:text(p.timeframeStatus)||text(p.timeframe?.name)||null,assignedUserId:assigned.id,assignedUserName:assigned.name,assignedUserRole:assigned.role,createdAt:dt(p.created),updatedAt:dt(p.updated),lastActivityAt:dt(p.lastActivity),lastCommunicationAt:dt(p.lastCommunication),nextTaskAt:dt(p.nextTask?.dueDateTime||p.nextTask?.dueDate||p.nextTask?.due||p.nextTaskAt),handRaiseAt:dt(p.lastInquiry||p.lastInquiryAt),emails:arr(p.emails).map(x=>text(x?.value||x?.email||x)).filter(Boolean),phones:arr(p.phones).map(x=>text(x?.value||x?.phone||x)).filter(Boolean),tags,price:num(p.price),collaborators:arr(p.collaborators).map(x=>text(x?.name||x)).filter(Boolean),raw:p};
+  const communication=resolveLastCommunication(p);
+  const embeddedAppointment=p.nextAppointment??p.appointment??null;
+  return {id:p.id,name,stage,source,businessSegment,businessSegmentReason:lane.reason,businessSegmentEvidence:lane.evidence,leadLane:lane.lane,timeframeId:num(p.timeframeId),timeframeStatus:text(p.timeframeStatus)||text(p.timeframe?.name)||null,assignedUserId:assigned.id,assignedUserName:assigned.name,assignedUserRole:assigned.role,createdAt:dt(p.created),updatedAt:dt(p.updated),lastActivityAt:dt(p.lastActivity),lastCommunicationAt:communication.at,lastCommunicationSource:communication.source,nextTaskAt:dt(p.nextTask?.dueDateTime||p.nextTask?.dueDate||p.nextTask?.due||p.nextTaskAt),nextAppointmentAt:validDate(embeddedAppointment?.start??embeddedAppointment?.startAt??p.nextAppointmentAt),nextActionAt:null,nextActionSource:null,taskRepairRecommended:false,handRaiseAt:dt(p.lastInquiry||p.lastInquiryAt),emails:arr(p.emails).map(x=>text(x?.value||x?.email||x)).filter(Boolean),phones:arr(p.phones).map(x=>text(x?.value||x?.phone||x)).filter(Boolean),tags,price:num(p.price),collaborators:arr(p.collaborators).map(x=>text(x?.name||x)).filter(Boolean),raw:p};
 }
 export const normalizeTask=(t:any,userMap?:Map<number,NormalizedUser>):NormalizedTask=>{const uid=num(t.assignedUserId??t.assignedTo?.id);return {id:t.id,personId:t.personId??t.person?.id??null,assignedUserId:uid,assignedUserName:(uid!==null?userMap?.get(uid)?.name:undefined)||(typeof t.assignedTo==='string'?text(t.assignedTo):text(t.assignedTo?.name))||undefined,name:text(t.name)||'Task',type:text(t.type)||'Follow Up',dueAt:dt(t.dueDateTime||t.due||t.dueDate),isCompleted:bool(t.isCompleted),raw:t};};
+export const normalizeAppointment=(a:any):NormalizedAppointment=>{
+  const ids=[a.personId,a.person?.id,a.contactId,...arr(a.invitees).map(item=>item?.personId),...arr(a.people).map(item=>item?.personId??item?.id)].filter(value=>value!==null&&value!==undefined&&String(value).trim());
+  const status=text(a.status||a.state).toLowerCase(),isCancelled=bool(a.isCancelled??a.cancelled)||['cancelled','canceled','deleted'].includes(status);
+  return {id:a.id??`appointment-${validDate(a.start??a.startAt)??'unknown'}`,personIds:[...new Set(ids)],title:text(a.title||a.name||a.type)||'Appointment',startAt:validDate(a.start??a.startAt??a.startTime??a.date),endAt:validDate(a.end??a.endAt??a.endTime),status:status||'scheduled',isCancelled,raw:a};
+};

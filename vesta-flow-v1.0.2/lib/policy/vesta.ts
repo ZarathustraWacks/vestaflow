@@ -1,3 +1,4 @@
+/** Versioned SOP-derived operating lanes, cadence rules, and response standards. */
 export type LeadLane='buyer'|'seller'|'renter'|'candidate-rental'|'needs-classification';
 export type CadenceStatus='current'|'due'|'overdue'|'not-required'|'unknown';
 export interface CadencePolicy {key:string;label:string;days:number|null;clearRequired:boolean;basis:string;}

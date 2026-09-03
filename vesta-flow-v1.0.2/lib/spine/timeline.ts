@@ -1,3 +1,4 @@
+/** Merge FUB activity collections into a chronological, source-labelled timeline. */
 import { NormalizedLead, NormalizedTask, TimelineEvent } from '@/lib/domain/types';
 const time=(x:any)=>x?.created||x?.createdAt||x?.start||x?.startAt||x?.date||x?.occurredAt||x?.timestamp||x?.dueDateTime||x?.due||x?.dueDate||null;
 const validTime=(value:string|null)=>value&&Number.isFinite(new Date(value).getTime())?value:null;
