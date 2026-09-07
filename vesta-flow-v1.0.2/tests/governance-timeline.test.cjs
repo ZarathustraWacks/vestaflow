@@ -40,6 +40,16 @@ test('normalizes FUB owner, timed task due date, string completion, and rental m
   assert.equal(task.dueAt,'2099-01-01T15:30:00Z');
   assert.equal(task.isCompleted,false);
 });
++
+
+test('communication normalization recognizes calls and rejects ambiguous generic strings',()=>{
+  const callAt=iso(-0.25);
+  assert.equal(normalizePersonBase({id:2,name:'Call attempt',assignedUserId:7,lastOutgoingCall:callAt},users).lastCommunicationAt,callAt);
+  assert.equal(normalizePersonBase({id:3,name:'Ambiguous',assignedUserId:7,lastEmailAt:iso(-0.1),lastTextAt:iso(-0.2)},users).lastCommunicationAt,null);
+  const sentAt=iso(-0.05);
+  assert.equal(normalizePersonBase({id:4,name:'Explicit text',assignedUserId:7,lastText:{direction:'outbound',sentAt}},users).lastCommunicationAt,sentAt);
+});
+
 
 test('classifies common rental variants without leaking ordinary buyers and sellers',()=>{
   const rentals=[

@@ -6,16 +6,16 @@ const dt=(v:unknown)=>typeof v==='string'&&v.trim()?v:null;
 const num=(v:unknown)=>typeof v==='number'?v:(typeof v==='string'&&v.trim()&&!Number.isNaN(Number(v))?Number(v):null);
 const text=(v:unknown)=>typeof v==='string'?v.trim():'';
 const bool=(v:unknown)=>v===true||v===1||(typeof v==='string'&&['true','1','yes'].includes(v.trim().toLowerCase()));
-type CommunicationSource='fub-last-communication'|'fub-contacted'|'outbound-email'|'outbound-text'|'email'|'text'|null;
+type CommunicationSource='fub-last-communication'|'fub-contacted'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|null;
 const validDate=(value:unknown):string|null=>{
-  if(typeof value==='string'&&value.trim()&&Number.isFinite(new Date(value).getTime()))return value;
+  return typeof value==='string'&&value.trim()&&Number.isFinite(new Date(value).getTime())?value:null;
+};
+const encodedBool=(value:unknown):boolean|null=>{if(value===true||value===1)return true;if(value===false||value===0)return false;if(typeof value!=='string')return null;const normalized=value.trim().toLowerCase();if(['true','1','yes'].includes(normalized))return true;if(['false','0','no'].includes(normalized))return false;return null;};
+const explicitlyOutboundObjectDate=(value:unknown):string|null=>{
   if(!value||typeof value!=='object')return null;
   const item=value as Record<string,unknown>,direction=text(item.direction??item.type).toLowerCase();
-  if(['incoming','inbound','received'].includes(direction))return null;
-  for(const key of ['sentAt','created','createdAt','occurredAt','timestamp','date','updatedAt']){
-    const candidate=item[key];
-    if(typeof candidate==='string'&&candidate.trim()&&Number.isFinite(new Date(candidate).getTime()))return candidate;
-  }
+  if(!(['outgoing','outbound','sent'].includes(direction)||encodedBool(item.isIncoming)===false))return null;
+  for(const key of ['startedAt','sentAt','occurredAt','eventCreated','createdAt','created','date','timestamp']){const found=validDate(item[key]);if(found)return found;}
   return null;
 };
 /**
@@ -27,10 +27,11 @@ export function resolveLastCommunication(p:any):{at:string|null;source:Communica
   const candidates:{source:Exclude<CommunicationSource,null>;value:unknown}[]=[
     {source:'fub-last-communication',value:p.lastCommunication??p.lastCommunicationAt},
     {source:'fub-contacted',value:p.contacted},
-    {source:'outbound-email',value:p.lastEmailSentAt??p.lastOutboundEmailAt??p.lastSentEmail??p.emailLastSentAt??p.communication?.lastEmailSentAt},
-    {source:'outbound-text',value:p.lastTextSentAt??p.lastOutboundTextAt??p.lastSentText??p.textLastSentAt??p.lastSmsSentAt??p.communication?.lastTextSentAt},
-    {source:'email',value:p.lastEmailAt??p.lastEmailDate??p.lastEmail??p.communication?.lastEmailAt},
-    {source:'text',value:p.lastTextAt??p.lastTextDate??p.lastText??p.lastSmsAt??p.communication?.lastTextAt},
+    {source:'outbound-call',value:p.lastOutgoingCall??p.lastOutboundCallAt??p.communication?.lastOutgoingCall??p.communication?.lastOutboundCallAt},
+    {source:'outbound-email',value:p.lastEmailSentAt??p.lastOutboundEmailAt??p.lastSentEmail??p.emailLastSentAt??p.communication?.lastEmailSentAt??p.communication?.lastOutboundEmailAt},
+    {source:'outbound-text',value:p.lastTextSentAt??p.lastOutboundTextAt??p.lastSentText??p.textLastSentAt??p.lastSmsSentAt??p.communication?.lastTextSentAt??p.communication?.lastOutboundTextAt},
+    {source:'email',value:explicitlyOutboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
+    {source:'text',value:explicitlyOutboundObjectDate(p.lastText??p.lastSms??p.communication?.lastText)},
   ];
   const resolved=candidates.map(candidate=>({...candidate,at:validDate(candidate.value)})).filter(candidate=>candidate.at!==null).sort((a,b)=>new Date(b.at!).getTime()-new Date(a.at!).getTime())[0];
   return resolved?{at:resolved.at!,source:resolved.source}:{at:null,source:null};

@@ -14,7 +14,7 @@ export interface NormalizedLead {
   id:number|string; name:string; stage:string; source:string; businessSegment:'buyer-seller'|'rental'|'needs-classification'; businessSegmentReason:string; businessSegmentEvidence?:string[];
   leadLane:LeadLane; timeframeId:number|null; timeframeStatus:string|null;
   assignedUserId:number|null; assignedUserName:string; assignedUserRole:string|null;
-  createdAt:string|null; updatedAt:string|null; lastActivityAt:string|null; lastCommunicationAt:string|null; lastCommunicationSource?:'fub-last-communication'|'fub-contacted'|'outbound-email'|'outbound-text'|'email'|'text'|null; nextTaskAt:string|null;
+  createdAt:string|null; updatedAt:string|null; lastActivityAt:string|null; lastCommunicationAt:string|null; lastCommunicationSource?:'fub-last-communication'|'fub-contacted'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|null; nextTaskAt:string|null;
   nextAppointmentAt?:string|null; nextActionAt?:string|null; nextActionSource?:'task'|'appointment'|null; taskRepairRecommended?:boolean;
   routingManagerOwner?:boolean; routingCustody?:RoutingCustody|null; routingCustodyReason?:string|null;
   emails:string[]; phones:string[]; tags:string[]; price:number|null; collaborators:string[];

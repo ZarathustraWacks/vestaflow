@@ -1,6 +1,6 @@
 /** Merge FUB activity collections into a chronological, source-labelled timeline. */
 import { NormalizedLead, NormalizedTask, TimelineEvent } from '@/lib/domain/types';
-const time=(x:any)=>x?.created||x?.createdAt||x?.start||x?.startAt||x?.date||x?.occurredAt||x?.timestamp||x?.dueDateTime||x?.due||x?.dueDate||null;
+const time=(x:any)=>x?.startedAt||x?.sentAt||x?.occurredAt||x?.eventCreated||x?.start||x?.startAt||x?.createdAt||x?.created||x?.date||x?.timestamp||x?.dueDateTime||x?.due||x?.dueDate||null;
 const validTime=(value:string|null)=>value&&Number.isFinite(new Date(value).getTime())?value:null;
 export function buildTimeline(lead:NormalizedLead,tasks:NormalizedTask[],collections:Record<string,any[]>):TimelineEvent[]{
  const events:TimelineEvent[]=[];
