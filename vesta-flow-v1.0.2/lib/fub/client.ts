@@ -33,10 +33,16 @@ function resolveFubUrl(pathOrUrl: string): string {
 
 export async function fubRequest<T>(pathOrUrl: string, init: RequestInit = {}, attempt = 0): Promise<FubResponse<T>> {
   const url = resolveFubUrl(pathOrUrl);
-  const method=String(init.method||'GET').toUpperCase(),retrySafe=method==='GET'||method==='HEAD';
+  const method = String(init.method || 'GET').toUpperCase();
+  const retrySafe = method === 'GET' || method === 'HEAD';
   let response: Response;
   try {
-    response = await fetch(url, { ...init, headers: buildHeaders(init.headers), cache: 'no-store' });
+    response = await fetch(url, {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(15_000),
+      headers: buildHeaders(init.headers),
+      cache: 'no-store',
+    });
   } catch (error) {
     if (retrySafe && attempt < 3) {
       await sleep(500 * 2 ** attempt);

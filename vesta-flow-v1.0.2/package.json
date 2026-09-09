@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.cjs tests/*.mjs"
+    "lint": "npm run typecheck",
+    "test": "node --test tests/*.cjs tests/*.mjs",
+    "verify": "npm run lint && npm test",
+    "vercel-build": "npm run verify && next build"
   },
   "dependencies": {
     "next": "15.5.22",
