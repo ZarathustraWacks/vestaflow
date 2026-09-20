@@ -138,3 +138,13 @@ model outage cannot stop or alter a digest. Render only supplies the scheduler.
 Gmail uses OAuth refresh-token credentials with send-only scope. The sender
 address must be the prepared Gmail mailbox (or an alias that mailbox may send
 as). No Gmail credentials are placed on Render; they stay in Vercel.
+
+## Broker improvement plan
+
+Set `VESTA_FLOW_PIP_ENABLED=true` and
+`NEXT_PUBLIC_VESTA_FLOW_PIP_ENABLED=true` to add the broker-safe
+`/improvement-plan` view. Flow requests only the active plan for the selected
+broker and never receives confidential manager notes. A broker can see targets,
+weekly progress, evidence links, coaching actions, acknowledge the plan, or
+request a metric correction. Production rollout must bind `brokerId` to the
+authenticated broker identity; the current selector remains a demo limitation.
