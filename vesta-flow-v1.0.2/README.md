@@ -154,3 +154,12 @@ Flow now includes a read-only customer organizer with Everyone, Needs action, Ac
 The guided action flow now reads cadence and open FUB tasks from the same Render operational spine. `My tasks` is a separate, broker-scoped view with search and sort by due time, cadence lateness, priority, or customer name; it does not replace the `My action flow` next-best-action queue. Each task retains its FUB contact link and shows the cadence state that explains why the task is waiting.
 
 When a broker records a completed action, Flow writes a deterministic, retry-safe note to the FUB person timeline when `VESTA_FUB_WRITEBACK_ENABLED=true`. The note includes the outcome, broker, recommendation, cadence at action, and optional broker context. The Render ledger stores the decision and sync readback; duplicate submissions do not create duplicate FUB notes. Demo mode remains simulated and a disabled writeback remains visibly blocked.
+## Broker improvement plan
+
+Set `VESTA_FLOW_PIP_ENABLED=true` and
+`NEXT_PUBLIC_VESTA_FLOW_PIP_ENABLED=true` to add the broker-safe
+`/improvement-plan` view. Flow requests only the active plan for the selected
+broker and never receives confidential manager notes. A broker can see targets,
+weekly progress, evidence links, coaching actions, acknowledge the plan, or
+request a metric correction. Production rollout must bind `brokerId` to the
+authenticated broker identity; the current selector remains a demo limitation.
