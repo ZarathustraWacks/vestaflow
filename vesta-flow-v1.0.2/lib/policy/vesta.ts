@@ -1,3 +1,4 @@
+import {isSuppressedOperationalStage} from '@/lib/operational-eligibility';
 /** Versioned SOP-derived operating lanes, cadence rules, and response standards. */
 export type LeadLane='buyer'|'seller'|'renter'|'candidate-rental'|'needs-classification';
 export type CadenceStatus='current'|'due'|'overdue'|'not-required'|'unknown';
@@ -25,6 +26,7 @@ export function resolveLane(input:{stage:string;source:string;tags:string[]}){
 export function cadencePolicy(input:{lane:LeadLane;stage:string;tags:string[];timeframeStatus?:string|null}):CadencePolicy{
  const stage=lower(input.stage),tags=input.tags||[],timeframe=lower(input.timeframeStatus);
  const none=(key:string,label:string,basis:string):CadencePolicy=>({key,label,days:null,clearRequired:false,basis});
+ if(isSuppressedOperationalStage(input.stage))return none('suppressed-operational-stage','Inactive operating record','Retained for history and campaign review; excluded from active cadence.');
  if(input.lane==='needs-classification'||input.lane==='candidate-rental')return none('classification-review','Classification review','Lane must be confirmed before cadence can be trusted.');
  if(input.lane==='renter')return none('renter','Renters','SOP frequency is N/A.');
  if(input.lane==='seller'){

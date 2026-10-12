@@ -1,3 +1,4 @@
+import {isOperationalLead} from '@/lib/operational-eligibility';
 /** Derive governance evidence, scores, rollups, and stable decision snapshots. */
 import { createHash } from 'node:crypto';
 import { GovernanceSignal, NormalizedAppointment, NormalizedLead, NormalizedTask, NormalizedUser,OperationalClock } from '@/lib/domain/types';
@@ -37,8 +38,9 @@ export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'
  const ageBand=created<=7?'Fresh':created<=30?'Developing':created<=90?'Aged':created<=365?'Old':'Legacy';
  const engagementBand=activity===99999?'Unknown':activity<=7?'Active now':activity<=30?'Recently active':activity<=90?'Cooling':'Dormant';
  const policy=cadencePolicy({lane:base.leadLane,stage:base.stage,tags:base.tags,timeframeStatus:base.timeframeStatus});
- const cadence=cadenceState(policy,base.lastCommunicationAt,now),sla=responseSla(base.handRaiseAt,base.lastCommunicationAt,now);
- const raised=timestamp(base.handRaiseAt),contacted=timestamp(base.lastCommunicationAt),contactAfterRaise=raised!==null&&contacted!==null&&contacted>=raised?contacted:null,appointment=timestamp(nextAppointmentAt),cadenceDue=timestamp(cadence.dueAt);
+ const brokerActionAt=base.brokerOutreachAt||(String(base.lastCommunicationSource||'').startsWith('two-way-')?null:base.lastCommunicationAt);
+ const cadence=cadenceState(policy,base.lastCommunicationAt,now),sla=responseSla(base.handRaiseAt,brokerActionAt,now);
+ const raised=timestamp(base.handRaiseAt),contacted=timestamp(base.lastCommunicationAt),brokerAction=timestamp(brokerActionAt),contactAfterRaise=raised!==null&&brokerAction!==null&&brokerAction>=raised?brokerAction:null,appointment=timestamp(nextAppointmentAt),cadenceDue=timestamp(cadence.dueAt);
  const operationalClocks:OperationalClock[]=[
   clock('route-acceptance','Route acceptance',raised===null?null:raised+5*60000,null,'Accept or decline the routed lead.','ambiguous',now),
   clock('initial-acknowledgement','Initial acknowledgement',raised===null?null:addCentralBusinessMinutes(raised,1),contactAfterRaise,'Send the approved acknowledgement.','proposed',now),
@@ -70,6 +72,6 @@ export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'
 
 export function agentRollups(leads:NormalizedLead[],users:NormalizedUser[]){
  const map=new Map<number|null,{id:number|null;name:string;role:string;items:NormalizedLead[]}>();
- for(const lead of leads){const key=lead.assignedUserId,user=key!==null?users.find(item=>item.id===key):undefined,group=map.get(key)||{id:key,name:user?.name||lead.assignedUserName||'Unassigned',role:user?.role||lead.assignedUserRole||'Unknown',items:[]};group.items.push(lead);map.set(key,group)}
+ for(const lead of leads.filter(isOperationalLead)){const key=lead.assignedUserId,user=key!==null?users.find(item=>item.id===key):undefined,group=map.get(key)||{id:key,name:user?.name||lead.assignedUserName||'Unassigned',role:user?.role||lead.assignedUserRole||'Unknown',items:[]};group.items.push(lead);map.set(key,group)}
  return [...map.values()].map(group=>({id:group.id,name:group.name,role:group.role,leads:group.items.length,fresh:group.items.filter(item=>item.ageBand==='Fresh').length,critical:group.items.filter(item=>item.riskLevel==='Critical').length,noNext:group.items.filter(item=>item.cadenceStatus==='due'||item.cadenceStatus==='overdue').length,stale:group.items.filter(item=>item.engagementBand==='Dormant').length,averageScore:Math.round(group.items.reduce((sum,item)=>sum+item.governanceScore,0)/Math.max(1,group.items.length))})).sort((a,b)=>b.leads-a.leads);
 }

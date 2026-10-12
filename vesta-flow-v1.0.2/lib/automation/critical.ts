@@ -1,3 +1,4 @@
+import {isOperationalLead} from '@/lib/operational-eligibility';
 import type { ManagementException } from '@/lib/flow/types';
 
 export type CriticalRunKind='morning-reroutes'|'afternoon-critical';
@@ -27,7 +28,7 @@ export function dueRunKinds(now=new Date(),closures:string[]=[]):CriticalRunKind
  return kinds;
 }
 const inLocalWindow=(value:string,date:string,startHour:number,endHour:number)=>{const local=localParts(value);return local.date===date&&local.hour>=startHour&&local.hour<endHour};
-const active=(lead:any)=>!['closed','trash','deleted','dead','invalid','do not contact'].some(value=>String(lead.stage||'').toLowerCase().includes(value));
+const active=(lead:any)=>isOperationalLead(lead)&&!['closed','trash','deleted','dead','invalid','do not contact'].some(value=>String(lead.stage||'').toLowerCase().includes(value));
 
 export function morningCandidates(exceptions:ManagementException[],now=new Date(),closures:string[]=[]):CriticalCandidate[]{
  const previous=previousBusinessDate(localParts(now).date,closures);
@@ -40,11 +41,11 @@ export function afternoonCandidates(leads:any[],now=new Date()):CriticalCandidat
   const actionableAt=lead.handRaiseAt||lead.createdAt;if(!actionableAt||!inLocalWindow(actionableAt,today,9,13)||!active(lead))return [];
   const actionable=new Date(actionableAt),deadline=new Date(actionable.getTime()+4*3600000),hoursOverdue=(now.getTime()-deadline.getTime())/3600000;
   if(hoursOverdue<0)return [];
-  const communicated=lead.lastCommunicationAt&&new Date(lead.lastCommunicationAt).getTime()>=actionable.getTime();if(communicated)return [];
+  const effort=lead.brokerOutreachAt||(String(lead.lastCommunicationSource||'').startsWith('two-way-')?null:lead.lastCommunicationAt);const communicated=effort&&new Date(effort).getTime()>=actionable.getTime();if(communicated)return [];
   const critical=lead.decision?.urgency==='Immediate'||lead.riskLevel==='Critical'||lead.responseSlaStatus==='breached';if(!critical)return [];
   return [{key:`critical:${lead.id}:${actionable.toISOString()}`,leadId:String(lead.id),leadName:lead.name,ownerName:lead.assignedUserName,source:lead.source,segment:lead.leadLane,actionableAt:actionable.toISOString(),deadlineAt:deadline.toISOString(),hoursOverdue,recommendation:lead.decision?.label||lead.recommendedAction||'Contact immediately',reason:lead.decision?.rationale||'Critical lead has no visible qualifying contact.',governanceScore:lead.governanceScore,fubUrl:`${webBase()}/${lead.id}`,evidence:['Critical existing-spine decision','Four-hour threshold elapsed','No qualifying communication after actionable time'],origin:'existing-raven' as const}];
  });
 }
 
-export function stillUncontacted(candidate:CriticalCandidate,lead:any){const communication=lead?.lastCommunicationAt;return !communication||new Date(communication).getTime()<new Date(candidate.actionableAt).getTime()}
+export function stillUncontacted(candidate:CriticalCandidate,lead:any){const communication=lead?.brokerOutreachAt||(String(lead?.lastCommunicationSource||'').startsWith('two-way-')?null:lead?.lastCommunicationAt);return !communication||new Date(communication).getTime()<new Date(candidate.actionableAt).getTime()}
 export function localRunKey(kind:CriticalRunKind,now=new Date(),policyVersion='critical-actions-v1'){return `${localParts(now).date}:${kind}:${policyVersion}`}

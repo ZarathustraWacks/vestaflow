@@ -257,3 +257,83 @@ test('morning reroute digest uses unresolved passes from prior noon-to-five wind
   const candidates=morningCandidates([{lead,passEvent,previousBroker:'Agent',recommendedBrokerName:'Next Agent'}],new Date('2026-08-18T14:00:00Z'));
   assert.equal(candidates.length,1);assert.equal(candidates[0].suggestedOwnerName,'Next Agent');
 });
+
+
+test('outreach counts without an outcome and a later reply resets cadence',()=>{
+ const sent='2026-09-01T10:00:00Z',reply='2026-09-04T10:00:00Z';
+ for(const outcome of ['', 'No Answer','Left Message']){
+  const base={id:90,stage:'Lead',tags:['buyer'],lastCall:{isIncoming:false,startedAt:sent,outcome}};
+  const before=normalizePersonBase(base,users);
+  const after=normalizePersonBase({...base,lastCommunication:reply,contacted:reply,lastText:{isIncoming:true,created:reply}},users);
+  assert.equal(before.lastCommunicationAt,sent);
+  assert.equal(after.lastCommunicationAt,reply);
+  assert.equal(after.brokerOutreachAt,sent);
+  assert.equal(after.lastCommunicationSource,'two-way-text');
+  assert.ok(Date.parse(enrichLead(after,[]).cadenceDueAt)>Date.parse(enrichLead(before,[]).cadenceDueAt));
+ }
+});
+
+test('inbound-only and contradictory direction cannot manufacture effort',()=>{
+ const at='2026-09-04T10:00:00Z';
+ for(const extra of [
+  {lastIncomingCall:at},
+  {lastEmail:{isIncoming:true,created:at}},
+  {lastText:{direction:'incoming',isIncoming:false,created:at}},
+  {lastCall:{direction:'outbound',isIncoming:true,startedAt:at}},
+ ]){
+  assert.equal(normalizePersonBase({id:91,lastCommunication:at,contacted:at,...extra},users).lastCommunicationAt,null);
+ }
+});
+
+test('latest explicit outreach wins without outcome or response',()=>{
+ const older='2026-09-01T10:00:00Z',newer='2026-09-02T10:00:00Z';
+ const lead=normalizePersonBase({id:92,lastOutgoingCall:older,lastText:{direction:'sent',sentAt:newer}},users);
+ assert.equal(lead.lastCommunicationAt,newer);
+ assert.equal(lead.lastCommunicationSource,'text');
+});
+
+
+test('a reply resets cadence but does not satisfy a separate broker response obligation',()=>{
+ const realNow=Date.now;Date.now=()=>Date.parse('2026-09-14T20:00:00Z');
+ try{
+  const raw={id:990,stage:'Lead',tags:['buyer'],assignedUserId:7,created:'2026-09-01T13:00:00Z',lastTextSentAt:'2026-09-14T13:00:00Z',lastInquiry:'2026-09-14T15:00:00Z',lastTextReceivedAt:'2026-09-14T16:00:00Z'};
+  const lead=enrichLead(normalizePersonBase(raw,users),[]);
+  assert.equal(lead.cadenceStatus,'current');
+  assert.equal(lead.lastCommunicationAt,raw.lastTextReceivedAt);
+  assert.equal(lead.brokerOutreachAt,raw.lastTextSentAt);
+  const response=lead.operationalClocks.find(row=>row.key==='first-contact-attempt');
+  assert.equal(response.clearedAt,null);
+  assert.equal(response.status,'breached');
+  const answered=enrichLead(normalizePersonBase({...raw,lastTextReceivedAt:null,lastTextSentAt:'2026-09-14T16:00:00Z'},users),[]);
+  assert.equal(answered.cadenceStatus,'current');
+  assert.equal(answered.operationalClocks.find(row=>row.key==='first-contact-attempt').status,'met');
+ }finally{Date.now=realNow;}
+});
+
+
+test('critical recheck does not mistake customer reply for broker response',()=>{
+ const {stillUncontacted}=require('../lib/automation/critical.ts');
+ const candidate={actionableAt:'2026-09-14T15:00:00Z'};
+ const lead=normalizePersonBase({id:991,lastTextSentAt:'2026-09-14T13:00:00Z',lastTextReceivedAt:'2026-09-14T16:00:00Z'},users);
+ assert.equal(stillUncontacted(candidate,lead),true);
+ assert.equal(stillUncontacted(candidate,{...lead,brokerOutreachAt:'2026-09-14T16:00:00Z'}),false);
+});
+
+
+test('inactive campaign and archived stages remain visible but leave active cadence and rollups',()=>{
+ const {agentRollups}=require('../lib/spine/governance.ts');
+ const stages=['Cold Leads',' cold   LEADS ','Trash','Deleted','Archived'];
+ const inactive=stages.map(stage=>enrichLead(person({stage,lastCommunication:null}),[]));
+ for(const lead of inactive){assert.equal(lead.cadenceStatus,'not-required');assert.ok(lead.raw);}
+ assert.deepEqual(agentRollups(inactive,Array.from(users.values())),[]);
+ const closed=enrichLead(person({stage:'Closed',lastCommunication:iso(-1)}),[]);
+ assert.equal(closed.cadenceKey,'past-client');assert.equal(agentRollups([closed],Array.from(users.values()))[0].leads,1);
+});
+
+
+test('Cold Leads cannot enter the broker queue or critical follow-up automation',()=>{
+ const cold=enrichLead(person({stage:'Cold Leads',lastInquiry:'2026-09-14T15:00:00Z',lastCommunication:null}),[]);
+ const critical={...cold,riskLevel:'Critical',responseSlaStatus:'breached',decision:{...cold.decision,urgency:'Immediate'}};
+ assert.deepEqual(buildFlowQueue([critical],[],7),[]);
+ assert.deepEqual(afternoonCandidates([critical],new Date('2026-09-14T21:00:00Z')),[]);
+});

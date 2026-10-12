@@ -6,35 +6,72 @@ const dt=(v:unknown)=>typeof v==='string'&&v.trim()?v:null;
 const num=(v:unknown)=>typeof v==='number'?v:(typeof v==='string'&&v.trim()&&!Number.isNaN(Number(v))?Number(v):null);
 const text=(v:unknown)=>typeof v==='string'?v.trim():'';
 const bool=(v:unknown)=>v===true||v===1||(typeof v==='string'&&['true','1','yes'].includes(v.trim().toLowerCase()));
-type CommunicationSource='fub-last-communication'|'fub-contacted'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|null;
-const validDate=(value:unknown):string|null=>{
-  return typeof value==='string'&&value.trim()&&Number.isFinite(new Date(value).getTime())?value:null;
-};
-const encodedBool=(value:unknown):boolean|null=>{if(value===true||value===1)return true;if(value===false||value===0)return false;if(typeof value!=='string')return null;const normalized=value.trim().toLowerCase();if(['true','1','yes'].includes(normalized))return true;if(['false','0','no'].includes(normalized))return false;return null;};
-const explicitlyOutboundObjectDate=(value:unknown):string|null=>{
+type CommunicationSource='fub-last-communication'|'fub-contacted'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|'two-way-call'|'two-way-email'|'two-way-text'|null;
+type CustomerResponseSource='inbound-call'|'inbound-email'|'inbound-text'|null;
+const objectDate=(value:unknown):string|null=>{
+  if(typeof value==='string'&&value.trim()&&Number.isFinite(new Date(value).getTime()))return value;
   if(!value||typeof value!=='object')return null;
-  const item=value as Record<string,unknown>,direction=text(item.direction??item.type).toLowerCase();
-  if(!(['outgoing','outbound','sent'].includes(direction)||encodedBool(item.isIncoming)===false))return null;
-  for(const key of ['startedAt','sentAt','occurredAt','eventCreated','createdAt','created','date','timestamp']){const found=validDate(item[key]);if(found)return found;}
+  const item=value as Record<string,unknown>;
+  for(const key of ['startedAt','sentAt','created','createdAt','occurredAt','timestamp','date','updatedAt']){
+    const candidate=item[key];
+    if(typeof candidate==='string'&&candidate.trim()&&Number.isFinite(new Date(candidate).getTime()))return candidate;
+  }
   return null;
 };
+const validDate=objectDate;
+const directionOf=(item:Record<string,unknown>)=>text(item.direction??item.callDirection??item.messageDirection??item.type).toLowerCase();
+const isOutbound=(item:Record<string,unknown>)=>item.isIncoming===false||item.isIncoming===0||item.isIncoming==='false'||item.incoming===false||item.incoming===0||item.incoming==='false'||item.isOutgoing===true||item.isOutgoing===1||item.isOutgoing==='true'||item.outgoing===true||item.outgoing===1||item.outgoing==='true'||['outgoing','outbound','sent','out','outgoing call','outbound call'].includes(directionOf(item));
+const isInbound=(item:Record<string,unknown>)=>item.isIncoming===true||item.isIncoming===1||item.isIncoming==='true'||item.incoming===true||item.incoming===1||item.incoming==='true'||item.isOutgoing===false||item.isOutgoing===0||item.isOutgoing==='false'||item.outgoing===false||item.outgoing===0||item.outgoing==='false'||['incoming','inbound','received','in','incoming call','inbound call'].includes(directionOf(item));
+const explicitlyOutboundObjectDate=(value:unknown):string|null=>{
+  if(!value||typeof value!=='object')return null;
+  const item=value as Record<string,unknown>;
+  return isOutbound(item)&&!isInbound(item)?objectDate(item):null;
+};
+const explicitlyInboundObjectDate=(value:unknown):string|null=>{
+  if(!value||typeof value!=='object')return null;
+  const item=value as Record<string,unknown>;
+  return isInbound(item)?objectDate(item):null;
+};
+const newest=<T extends string>(candidates:{source:T;at:string|null}[])=>candidates.filter(candidate=>candidate.at&&Number.isFinite(Date.parse(candidate.at))).sort((a,b)=>Date.parse(b.at!)-Date.parse(a.at!))[0]||null;
+
 /**
- * Resolve the newest outbound communication timestamp exposed on a FUB person.
- * `contacted` is retained because FUB commonly advances it after logged email,
- * text, and call activity even when `lastCommunication` is absent or stale.
+ * Keep broker effort and customer engagement on separate clocks.
+ * Outreach resets cadence without requiring a reply. A later customer reply
+ * can restart cadence too, while remaining separate from broker action credit.
+ */
+export function resolveCadenceCommunication(p:any):{at:string|null;source:CommunicationSource;brokerOutreachAt:string|null;customerResponseAt:string|null;customerResponseSource:CustomerResponseSource;twoWayEngagementAt:string|null}{
+  const outreach=newest([
+    {source:'outbound-call',at:objectDate(p.lastOutgoingCall??p.lastOutboundCallAt??p.communication?.lastOutgoingCall??p.communication?.lastOutboundCallAt)},
+    {source:'outbound-email',at:objectDate(p.lastEmailSentAt??p.lastOutboundEmailAt??p.lastSentEmail??p.emailLastSentAt??p.communication?.lastEmailSentAt)},
+    {source:'outbound-text',at:objectDate(p.lastTextSentAt??p.lastOutboundTextAt??p.lastSentText??p.textLastSentAt??p.lastSmsSentAt??p.communication?.lastTextSentAt)},
+    {source:'email',at:explicitlyOutboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
+    {source:'text',at:explicitlyOutboundObjectDate(p.lastText??p.communication?.lastText)},
+    {source:'outbound-call',at:explicitlyOutboundObjectDate(p.lastCall??p.communication?.lastCall)},
+  ] as {source:Exclude<CommunicationSource,null>;at:string|null}[]);
+  const response=newest([
+    {source:'inbound-call',at:objectDate(p.lastIncomingCall??p.lastInboundCallAt??p.lastReceivedCall??p.callLastReceivedAt??p.communication?.lastIncomingCall??p.communication?.lastInboundCallAt)},
+    {source:'inbound-email',at:objectDate(p.lastEmailReceivedAt??p.lastInboundEmailAt??p.lastReceivedEmail??p.emailLastReceivedAt??p.communication?.lastEmailReceivedAt)},
+    {source:'inbound-text',at:objectDate(p.lastTextReceivedAt??p.lastInboundTextAt??p.lastReceivedText??p.textLastReceivedAt??p.lastSmsReceivedAt??p.communication?.lastTextReceivedAt)},
+    {source:'inbound-call',at:explicitlyInboundObjectDate(p.lastCall??p.communication?.lastCall)},
+    {source:'inbound-email',at:explicitlyInboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
+    {source:'inbound-text',at:explicitlyInboundObjectDate(p.lastText??p.communication?.lastText)},
+  ] as {source:Exclude<CustomerResponseSource,null>;at:string|null}[]);
+  const paired=Boolean(outreach?.at&&response?.at&&Date.parse(response.at)>=Date.parse(outreach.at));
+  // Retain a legacy aggregate only when explicit effort is absent and the
+  // aggregate is not the known customer-response timestamp. Consumers can
+  // identify this weaker evidence by its fub-last-communication source.
+  const aggregate=objectDate(p.lastCommunication??p.lastCommunicationAt);
+  const responseTime=response?.at?Date.parse(response.at):null;
+  const legacy=newest([{source:'fub-last-communication' as const,at:aggregate},{source:'fub-contacted' as const,at:objectDate(p.contacted)}].filter(row=>row.at!==null&&(responseTime===null||Date.parse(row.at)!==responseTime)));
+  const effective=paired?{source:response!.source.replace('inbound-','two-way-') as CommunicationSource,at:response!.at}:outreach||legacy;
+  return {at:effective?.at||null,source:effective?.source||null,brokerOutreachAt:outreach?.at||null,customerResponseAt:response?.at||null,customerResponseSource:response?.source||null,twoWayEngagementAt:paired?response!.at:null};
+}
+/**
+ * Compatibility wrapper for cadence: outreach alone or a later customer reply.
  */
 export function resolveLastCommunication(p:any):{at:string|null;source:CommunicationSource}{
-  const candidates:{source:Exclude<CommunicationSource,null>;value:unknown}[]=[
-    {source:'fub-last-communication',value:p.lastCommunication??p.lastCommunicationAt},
-    {source:'fub-contacted',value:p.contacted},
-    {source:'outbound-call',value:p.lastOutgoingCall??p.lastOutboundCallAt??p.communication?.lastOutgoingCall??p.communication?.lastOutboundCallAt},
-    {source:'outbound-email',value:p.lastEmailSentAt??p.lastOutboundEmailAt??p.lastSentEmail??p.emailLastSentAt??p.communication?.lastEmailSentAt??p.communication?.lastOutboundEmailAt},
-    {source:'outbound-text',value:p.lastTextSentAt??p.lastOutboundTextAt??p.lastSentText??p.textLastSentAt??p.lastSmsSentAt??p.communication?.lastTextSentAt??p.communication?.lastOutboundTextAt},
-    {source:'email',value:explicitlyOutboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
-    {source:'text',value:explicitlyOutboundObjectDate(p.lastText??p.lastSms??p.communication?.lastText)},
-  ];
-  const resolved=candidates.map(candidate=>({...candidate,at:validDate(candidate.value)})).filter(candidate=>candidate.at!==null).sort((a,b)=>new Date(b.at!).getTime()-new Date(a.at!).getTime())[0];
-  return resolved?{at:resolved.at!,source:resolved.source}:{at:null,source:null};
+  const resolved=resolveCadenceCommunication(p);
+  return {at:resolved.at,source:resolved.source};
 }
 const DEFAULT_RENTAL_MARKERS=['rent','rental','rentals','renter','renters','tenant','tenants','lease','leasing','apartment','apartments'];
 // Account-specific markers extend the safe defaults. They must not replace them,
@@ -85,9 +122,9 @@ export function normalizePersonBase(p:any,userMap?:Map<number,NormalizedUser>):O
   const assigned=resolveAssignment(p,userMap);
   const tags=arr(p.tags).map(x=>typeof x==='string'?x:text(x?.name??x?.value??x?.tag??x?.label)).filter(Boolean),stage=text(p.stage)||'Unknown',source=text(p.source)||'Unknown';const lane=resolveLane({stage,source,tags});
   const businessSegment=lane.lane==='renter'?'rental':lane.lane==='candidate-rental'||lane.lane==='needs-classification'?'needs-classification':'buyer-seller';
-  const communication=resolveLastCommunication(p);
+  const communication=resolveCadenceCommunication(p);
   const embeddedAppointment=p.nextAppointment??p.appointment??null;
-  return {id:p.id,name,stage,source,businessSegment,businessSegmentReason:lane.reason,businessSegmentEvidence:lane.evidence,leadLane:lane.lane,timeframeId:num(p.timeframeId),timeframeStatus:text(p.timeframeStatus)||text(p.timeframe?.name)||null,assignedUserId:assigned.id,assignedUserName:assigned.name,assignedUserRole:assigned.role,createdAt:dt(p.created),updatedAt:dt(p.updated),lastActivityAt:dt(p.lastActivity),lastCommunicationAt:communication.at,lastCommunicationSource:communication.source,nextTaskAt:dt(p.nextTask?.dueDateTime||p.nextTask?.dueDate||p.nextTask?.due||p.nextTaskAt),nextAppointmentAt:validDate(embeddedAppointment?.start??embeddedAppointment?.startAt??p.nextAppointmentAt),nextActionAt:null,nextActionSource:null,taskRepairRecommended:false,handRaiseAt:dt(p.lastInquiry||p.lastInquiryAt),emails:arr(p.emails).map(x=>text(x?.value||x?.email||x)).filter(Boolean),phones:arr(p.phones).map(x=>text(x?.value||x?.phone||x)).filter(Boolean),tags,price:num(p.price),collaborators:arr(p.collaborators).map(x=>text(x?.name||x)).filter(Boolean),raw:p};
+  return {id:p.id,name,stage,source,businessSegment,businessSegmentReason:lane.reason,businessSegmentEvidence:lane.evidence,leadLane:lane.lane,timeframeId:num(p.timeframeId),timeframeStatus:text(p.timeframeStatus)||text(p.timeframe?.name)||null,assignedUserId:assigned.id,assignedUserName:assigned.name,assignedUserRole:assigned.role,createdAt:dt(p.created),updatedAt:dt(p.updated),lastActivityAt:dt(p.lastActivity),lastCommunicationAt:communication.at,lastCommunicationSource:communication.source,brokerOutreachAt:communication.brokerOutreachAt,customerResponseAt:communication.customerResponseAt,twoWayEngagementAt:communication.twoWayEngagementAt,nextTaskAt:dt(p.nextTask?.dueDateTime||p.nextTask?.dueDate||p.nextTask?.due||p.nextTaskAt),nextAppointmentAt:validDate(embeddedAppointment?.start??embeddedAppointment?.startAt??p.nextAppointmentAt),nextActionAt:null,nextActionSource:null,taskRepairRecommended:false,handRaiseAt:dt(p.lastInquiry||p.lastInquiryAt),emails:arr(p.emails).map(x=>text(x?.value||x?.email||x)).filter(Boolean),phones:arr(p.phones).map(x=>text(x?.value||x?.phone||x)).filter(Boolean),tags,price:num(p.price),collaborators:arr(p.collaborators).map(x=>text(x?.name||x)).filter(Boolean),raw:p};
 }
 export const normalizeTask=(t:any,userMap?:Map<number,NormalizedUser>):NormalizedTask=>{const uid=num(t.assignedUserId??t.assignedTo?.id);return {id:t.id,personId:t.personId??t.person?.id??null,assignedUserId:uid,assignedUserName:(uid!==null?userMap?.get(uid)?.name:undefined)||(typeof t.assignedTo==='string'?text(t.assignedTo):text(t.assignedTo?.name))||undefined,name:text(t.name)||'Task',type:text(t.type)||'Follow Up',dueAt:dt(t.dueDateTime||t.due||t.dueDate),isCompleted:bool(t.isCompleted),raw:t};};
 export const normalizeAppointment=(a:any):NormalizedAppointment=>{
