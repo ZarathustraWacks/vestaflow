@@ -20,5 +20,5 @@ export async function buildCriticalRun(kind:CriticalRunKind,now=new Date()){
  const [spine,events]=await Promise.all([getSpine(),listFlowEvents()]),brokers=discoverBrokers(spine.people.items,spine.users.items);
  const initial=kind==='morning-reroutes'?morningCandidates(buildManagementExceptions(spine.people.items,events,brokers),now):afternoonCandidates(spine.people.items,now);
  const checked=await recheck(initial,kind,spine);
- return {kind,mode:spine.mode,generatedAt:now.toISOString(),initialCount:initial.length,candidates:checked.eligible,suppressed:checked.suppressed,source:'existing-vesta-fub-spine',renderRequired:false};
+ return {kind,mode:spine.mode,generatedAt:now.toISOString(),initialCount:initial.length,candidates:checked.eligible,suppressed:checked.suppressed,source:'existing-vesta-fub-spine',renderRequired:true};
 }
