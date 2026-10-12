@@ -1,3 +1,4 @@
+import {isOperationalLead} from '@/lib/operational-eligibility';
 import type { FlowEvent,FlowItem,ManagementException } from './types';
 
 const leadEvents=(events:FlowEvent[],leadId:string)=>events.filter(event=>event.leadId===leadId).sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
@@ -43,7 +44,7 @@ function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
 
 export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|null):FlowItem[]{
  const items:FlowItem[]=[];
- for(const lead of leads){
+ for(const lead of leads.filter(isOperationalLead)){
  const history=leadEvents(events,String(lead.id)),owner=latestOwnership(lead,history);
   if(owner.id!==brokerId||suppressed(lead,history)||!actionable(lead))continue;
   const score=priorityScore(lead),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
@@ -53,6 +54,7 @@ export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|nu
 }
 
 export function buildManagementExceptions(leads:any[],events:FlowEvent[],users:any[]):ManagementException[]{
+ leads=leads.filter(isOperationalLead);
  const leadMap=new Map(leads.map(lead=>[String(lead.id),lead]));
  return events.filter(event=>event.kind==='broker.pass').filter(pass=>!events.some(event=>resolutionKinds.has(event.kind)&&event.parentEventId===pass.id)).map(pass=>{
   const lead=leadMap.get(pass.leadId);if(!lead)return null;
