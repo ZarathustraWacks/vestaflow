@@ -12,6 +12,9 @@ export type OperationalSnapshot={
  counts:Record<string,number>;
  checkpoints:SnapshotCheckpoint[];
  collections:{people:unknown[];users:unknown[];tasks:unknown[];appointments:unknown[]};
+ communicationIndex?:unknown[];
+ communicationBehaviorIndex?:unknown[];
+ claimCallIndex?:unknown[];
 };
 export type OperationalSnapshotMeta=Omit<OperationalSnapshot,'collections'>;
 

@@ -15,7 +15,17 @@ function priorityScore(lead:any){
  const sla=lead.responseSlaStatus==='pending'?90:lead.responseSlaStatus==='breached'?75:0;
  const cadence=lead.cadenceStatus==='overdue'?50:lead.cadenceStatus==='due'?25:0;
  const confirmation=(lead.operationalClocks||[]).some((item:any)=>item.key==='appointment-confirmation'&&['pending','breached'].includes(item.status))?110:0;
- return urgency+risk+sla+cadence+confirmation+(100-Number(lead.governanceScore||0));
+ // Cadence is also an opportunity signal: recent customer activity, a near
+ // appointment, or verified broker effort can make a lead worth working now.
+ // These are additive boosts only; customer non-response never lowers a
+ // broker score and system/routing gaps never become broker failures.
+ const activityAt=lead.lastActivityAt?Date.parse(lead.lastActivityAt):NaN;
+ const communicationAt=lead.lastCommunicationAt?Date.parse(lead.lastCommunicationAt):NaN;
+ const activeMomentum=Number.isFinite(activityAt)&&(!Number.isFinite(communicationAt)||activityAt>communicationAt)&&Date.now()-activityAt<=7*86400000?35:0;
+ const appointmentAt=lead.nextAppointmentAt?Date.parse(lead.nextAppointmentAt):NaN;
+ const appointmentMomentum=Number.isFinite(appointmentAt)&&appointmentAt>=Date.now()&&appointmentAt-Date.now()<=48*3600000?80:0;
+ const recentEffort=Number(lead.evidenceSummary?.behavior?.windows?.['7']?.calls||0)+Number(lead.evidenceSummary?.behavior?.windows?.['7']?.texts||0)>0?15:0;
+ return urgency+risk+sla+cadence+confirmation+(100-Number(lead.governanceScore||0))+activeMomentum+appointmentMomentum+recentEffort;
 }
 
 function actionable(lead:any,now=Date.now()){

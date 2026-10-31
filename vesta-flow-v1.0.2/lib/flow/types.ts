@@ -27,7 +27,7 @@ export interface FlowEvent {
 }
 
 export interface FlowStorageStatus {
- mode:'durable-redis'|'temporary-memory'|'degraded-redis';
+ mode:'durable-postgres'|'degraded-postgres';
  durable:boolean;
  available:boolean;
  message:string;
