@@ -138,3 +138,19 @@ model outage cannot stop or alter a digest. Render only supplies the scheduler.
 Gmail uses OAuth refresh-token credentials with send-only scope. The sender
 address must be the prepared Gmail mailbox (or an alias that mailbox may send
 as). No Gmail credentials are placed on Render; they stay in Vercel.
+
+## 1.2.1 evidence and opportunity update
+
+Flow now consumes the compact communication, communication-behavior, and claim-call reductions already published by the Render operational snapshot. The snapshot path remains backward-compatible: older snapshots without these optional indexes still load, and direct FUB fallback is unchanged.
+
+The queue uses those reductions to keep broker-attributed outreach and customer-response evidence separate, while giving recent activity, near appointments, and verified recent effort a bounded opportunity boost. Customer non-response, routing delays, and connector gaps never reduce broker accountability. The Intelligence view labels when Render evidence is present.
+
+## Customer workspace views
+
+Flow now includes a read-only customer organizer with Everyone, Needs action, Active opportunities, Appointments, and Past clients views. Brokers can search by name, phone, email, stage, source, owner, or tag and sort by recent activity, overdue cadence, governance score, or name. Customer links open the stable FUB person route in a new tab; these views never change FUB data.
+
+## Cadence and personal task workspace
+
+The guided action flow now reads cadence and open FUB tasks from the same Render operational spine. `My tasks` is a separate, broker-scoped view with search and sort by due time, cadence lateness, priority, or customer name; it does not replace the `My action flow` next-best-action queue. Each task retains its FUB contact link and shows the cadence state that explains why the task is waiting.
+
+When a broker records a completed action, Flow writes a deterministic, retry-safe note to the FUB person timeline when `VESTA_FUB_WRITEBACK_ENABLED=true`. The note includes the outcome, broker, recommendation, cadence at action, and optional broker context. The Render ledger stores the decision and sync readback; duplicate submissions do not create duplicate FUB notes. Demo mode remains simulated and a disabled writeback remains visibly blocked.

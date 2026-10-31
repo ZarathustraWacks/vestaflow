@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { fubRequest,paginate } from './client';
 
-interface CompletionInput {leadId:string;decisionSnapshotId:string;actorUserId:number;actorName:string;recommendation:string;outcome:string;note?:string}
+interface CompletionInput {leadId:string;decisionSnapshotId:string;actorUserId:number;actorName:string;recommendation:string;outcome:string;note?:string;cadenceStatus?:string;cadenceLabel?:string}
 export interface FubCompletionSync {attempted:boolean;delivered:boolean;simulated:boolean;alreadySynced:boolean;resource:'note';resourceId:string|number|null;message:string}
 
 const writebackEnabled=()=>String(process.env.VESTA_FUB_WRITEBACK_ENABLED||'').trim().toLowerCase()==='true';
@@ -10,7 +10,7 @@ export function completionWritebackStatus(mode:'demo'|'live'){const enabled=mode
 export function buildCompletionNote(input:CompletionInput){
  const syncKey=createHash('sha256').update([input.leadId,input.decisionSnapshotId,input.actorUserId,input.outcome,input.note||''].join('|')).digest('hex').slice(0,24);
  const marker=`[Vesta Flow sync: ${syncKey}]`;
- const body=[`Outcome: ${input.outcome}`,`Broker: ${input.actorName}`,`Vesta recommendation: ${input.recommendation}`,input.note?`Broker note: ${input.note}`:null,'Recorded from Vesta Flow.',marker].filter(Boolean).join('\n');
+ const body=[`Outcome: ${input.outcome}`,`Broker: ${input.actorName}`,`Vesta recommendation: ${input.recommendation}`,input.cadenceLabel?`Cadence at action: ${input.cadenceLabel} (${input.cadenceStatus||'unknown'})`:null,input.note?`Broker note: ${input.note}`:null,'Recorded from Vesta Flow.',marker].filter(Boolean).join('\n');
  return {syncKey,marker,subject:'Vesta Flow · Done',body};
 }
 

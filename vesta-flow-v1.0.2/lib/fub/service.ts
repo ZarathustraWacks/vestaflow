@@ -54,7 +54,12 @@ async function compileOperationalSnapshot(snapshot:OperationalSnapshot){
  const userMap=new Map(userItems.map(user=>[user.id,user]));
  const taskItems=snapshot.collections.tasks.map(item=>normalizeTask(item,userMap)).filter(item=>!item.isCompleted);
  const appointmentItems=snapshot.collections.appointments.map(normalizeAppointment);
- const normalized=snapshot.collections.people.map(item=>applyRoutingContext(enrichLead(normalizePersonBase(item,userMap),taskItems,appointmentItems)));
+ const communicationByPerson=new Map((snapshot.communicationIndex||[]).map((item:any)=>[String(item.personId),item]));
+ const behaviorByPerson=new Map((snapshot.communicationBehaviorIndex||[]).map((item:any)=>[String(item.personId),item]));
+ const claimByPerson=new Map<string,any>();
+ for(const item of snapshot.claimCallIndex||[]){const key=String((item as any).personId);if(!claimByPerson.has(key))claimByPerson.set(key,item);}
+ const withEvidence=(item:any)=>{const id=String(item?.id??'');const communication=communicationByPerson.get(id);const evidenceSummary={communication:communication||null,behavior:behaviorByPerson.get(id)||null,claim:claimByPerson.get(id)||null};if(!communication)return {...item,vestaEvidence:evidenceSummary};const channel=String((communication as any).channel||'').toLowerCase(),at=(communication as any).lastCommunicationAt,baseCommunication={...(item.communication||{})};if(channel==='call')baseCommunication.lastOutgoingCall=at;if(channel==='text')baseCommunication.lastTextSentAt=at;if(channel==='email')baseCommunication.lastEmailSentAt=at;return {...item,communication:baseCommunication,vestaEvidence:evidenceSummary};};
+ const normalized=snapshot.collections.people.map(withEvidence).map(item=>applyRoutingContext(enrichLead(normalizePersonBase(item,userMap),taskItems,appointmentItems)));
  const peopleItems=await attachLearning(normalized);
  const people={mode:'live' as const,items:peopleItems,pages:Math.max(1,Math.ceil(peopleItems.length/100)),cache:'vercel-persistent',metadata:{snapshotId:snapshot.snapshotId,contractVersion:snapshot.contractVersion,counts:snapshot.counts},visited:[],appointmentConnector:{available:true,pages:Math.max(1,Math.ceil(appointmentItems.length/100)),cache:'render-snapshot',visibility:'Latest appointments present in the completed Render FUB mirror.',error:null}};
  const users={mode:'live' as const,items:userItems,pages:Math.max(1,Math.ceil(userItems.length/100)),cache:'vercel-persistent',metadata:{snapshotId:snapshot.snapshotId},visited:[]};

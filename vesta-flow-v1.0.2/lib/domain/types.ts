@@ -25,6 +25,7 @@ export interface NormalizedLead {
   rentalConversion?:{enrolled:boolean;status:'current'|'due'|'overdue'|'not-enrolled';dueAt:string|null;basis:string};
   governanceScore:number; governanceSignals:GovernanceSignal[]; riskLevel:'Critical'|'High'|'Medium'|'Healthy'; riskReasons:string[]; recommendedAction:string; decision:LeadDecision;
   learningScore?:LeadIntelligenceScore;
+  evidenceSummary?:{communication?:unknown;behavior?:unknown;claim?:unknown}|null;
   raw?:unknown;
 }
 export interface AgentRollup { id:number|null; name:string; role:string; leads:number; fresh:number; critical:number; noNext:number; stale:number; averageScore:number; }
