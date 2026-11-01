@@ -7,11 +7,13 @@ import { sendManagementAlert } from '@/lib/flow/alerts';
 import type { BrokerActionKind,FlowEvent } from '@/lib/flow/types';
 import { syncCompletionToFub } from '@/lib/fub/writeback';
 import { sendFlowTelemetry } from '@/lib/learning/telemetry';
+import { hasFubSession } from '@/lib/fub/session';
 
 const kinds=new Set<BrokerActionKind>(['broker.complete','broker.skip','broker.pass']);
 const text=(value:unknown)=>typeof value==='string'?value.trim():'';
 
 export async function POST(request:NextRequest){
+ if(!hasFubSession(request))return NextResponse.json({ok:false,error:'FUB authorization required.'},{status:401});
  try{
   const body=await request.json(),kind=body.kind as BrokerActionKind;
   if(!kinds.has(kind))return NextResponse.json({ok:false,error:'Invalid broker action.'},{status:400});

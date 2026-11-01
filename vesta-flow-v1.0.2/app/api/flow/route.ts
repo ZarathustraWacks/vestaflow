@@ -6,8 +6,10 @@ import { degradedFlowStorageStatus,flowStorageStatus,listFlowEvents } from '@/li
 import type { FlowEvent } from '@/lib/flow/types';
 import { completionWritebackStatus } from '@/lib/fub/writeback';
 import { isOperationalLead } from '@/lib/operational-eligibility';
+import { hasFubSession } from '@/lib/fub/session';
 
 export async function GET(request:NextRequest){
+ if(!hasFubSession(request))return NextResponse.json({ok:false,error:'FUB authorization required.'},{status:401});
  try{
   const spine=await getFlowSpine();
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
