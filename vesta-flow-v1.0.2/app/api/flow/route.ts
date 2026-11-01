@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from 'next/server';
-import { getSpine } from '@/lib/fub/service';
+import { getFlowSpine } from '@/lib/fub/service';
 import { buildFlowQueue } from '@/lib/flow/engine';
 import { discoverBrokers } from '@/lib/flow/brokers';
 import { degradedFlowStorageStatus,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
@@ -9,7 +9,7 @@ import { isOperationalLead } from '@/lib/operational-eligibility';
 
 export async function GET(request:NextRequest){
  try{
-  const spine=await getSpine();
+  const spine=await getFlowSpine();
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
   try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}
@@ -24,7 +24,7 @@ export async function GET(request:NextRequest){
     .map((task:any)=>{const lead=leadById.get(String(task.personId));return {id:String(task.id),leadId:task.personId?String(task.personId):null,name:task.name,type:task.type,dueAt:task.dueAt,assignedUserId:task.assignedUserId,assignedUserName:task.assignedUserName||lead?.assignedUserName||'Unassigned',cadenceStatus:lead?.cadenceStatus||'unknown',cadenceLabel:lead?.cadenceLabel||'No cadence',cadenceDaysLate:lead?.cadenceDaysLate||0,priority:lead?.decision?.urgency||'Monitor',leadName:lead?.name||'Unknown contact',leadStage:lead?.stage||'Unknown',fubUrl:lead?`/2/people/view/${lead.id}`:null};})
     .sort((a:any,b:any)=>(Date.parse(a.dueAt||'')||Infinity)-(Date.parse(b.dueAt||'')||Infinity));
   const taskSummary={total:tasks.length,overdue:tasks.filter((task:any)=>task.dueAt&&Date.parse(task.dueAt)<Date.now()).length,dueToday:tasks.filter((task:any)=>{if(!task.dueAt)return false;const d=new Date(task.dueAt),n=new Date();return d.toDateString()===n.toDateString()}).length};
-  const unresolvedOwners=spine.people.items.filter(lead=>lead.assignedUserId!==null&&!spine.users.items.some(user=>user.id===lead.assignedUserId)).length;
+  const unresolvedOwners=spine.people.items.filter((lead:any)=>lead.assignedUserId!==null&&!spine.users.items.some((user:any)=>user.id===lead.assignedUserId)).length;
   // Keep the browser payload broker-scoped. The shared snapshot remains on
   // the server, but a broker must not receive another broker's inventory.
   const customers=spine.people.items.filter(isOperationalLead).filter((lead:any)=>lead.assignedUserId===selectedBrokerId).map((lead:any)=>({id:lead.id,name:lead.name,stage:lead.stage,source:lead.source,leadLane:lead.leadLane,assignedUserId:lead.assignedUserId,assignedUserName:lead.assignedUserName,phones:lead.phones||[],emails:lead.emails||[],tags:lead.tags||[],cadenceLabel:lead.cadenceLabel,cadenceStatus:lead.cadenceStatus,cadenceDaysLate:lead.cadenceDaysLate,lastActivityAt:lead.lastActivityAt,lastCommunicationAt:lead.lastCommunicationAt,nextActionAt:lead.nextActionAt,nextActionSource:lead.nextActionSource,nextAppointmentAt:lead.nextAppointmentAt,governanceScore:lead.governanceScore,riskLevel:lead.riskLevel,decision:lead.decision,evidenceSummary:lead.evidenceSummary||null}));

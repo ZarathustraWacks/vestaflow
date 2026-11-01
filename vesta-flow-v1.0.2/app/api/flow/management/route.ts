@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest,NextResponse } from 'next/server';
-import { getSpine } from '@/lib/fub/service';
+import { getFlowSpine } from '@/lib/fub/service';
 import { buildManagementExceptions } from '@/lib/flow/engine';
 import { discoverBrokers } from '@/lib/flow/brokers';
 import { appendFlowEvent,degradedFlowStorageStatus,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
@@ -10,13 +10,13 @@ const decisions=new Set<ManagementActionKind>(['management.reroute','management.
 const text=(value:unknown)=>typeof value==='string'?value.trim():'';
 
 export async function GET(){
- try{const spine=await getSpine(),brokers=discoverBrokers(spine.people.items,spine.users.items);let events:FlowEvent[]=[],storage=flowStorageStatus();try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}return NextResponse.json({ok:true,mode:spine.mode,exceptions:buildManagementExceptions(spine.people.items,events,brokers),brokers,storage})}catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:'Unable to load management exceptions.'},{status:500})}
+ try{const spine=await getFlowSpine(),brokers=discoverBrokers(spine.people.items,spine.users.items);let events:FlowEvent[]=[],storage=flowStorageStatus();try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}return NextResponse.json({ok:true,mode:spine.mode,exceptions:buildManagementExceptions(spine.people.items,events,brokers),brokers,storage})}catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:'Unable to load management exceptions.'},{status:500})}
 }
 
 export async function POST(request:NextRequest){
  try{
   const body=await request.json(),kind=body.kind as ManagementActionKind;if(!decisions.has(kind))return NextResponse.json({ok:false,error:'Invalid management decision.'},{status:400});
-  const spine=await getSpine(),brokers=discoverBrokers(spine.people.items,spine.users.items);let events:FlowEvent[];try{events=await listFlowEvents()}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'Management actions are unavailable because the Vesta Flow action ledger cannot be reached.'},{status:503})}const pass=events.find(event=>event.id===String(body.passEventId)&&event.kind==='broker.pass');if(!pass)return NextResponse.json({ok:false,error:'The pass exception was not found.'},{status:404});
+  const spine=await getFlowSpine(),brokers=discoverBrokers(spine.people.items,spine.users.items);let events:FlowEvent[];try{events=await listFlowEvents()}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'Management actions are unavailable because the Vesta Flow action ledger cannot be reached.'},{status:503})}const pass=events.find(event=>event.id===String(body.passEventId)&&event.kind==='broker.pass');if(!pass)return NextResponse.json({ok:false,error:'The pass exception was not found.'},{status:404});
   if(events.some(event=>event.parentEventId===pass.id&&event.kind.startsWith('management.')))return NextResponse.json({ok:false,error:'Management has already resolved this pass.'},{status:409});
   const lead=spine.people.items.find(item=>String(item.id)===pass.leadId);if(!lead)return NextResponse.json({ok:false,error:'Lead not found.'},{status:404});
   const reason=text(body.reason),note=text(body.note);let targetUserId:number|null|undefined,targetUserName:string|undefined,returnAt:string|undefined;

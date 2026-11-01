@@ -70,6 +70,49 @@ async function compileOperationalSnapshot(snapshot:OperationalSnapshot){
 
 const cachedOperationalSpine=unstable_cache(async()=>compileOperationalSnapshot(await fetchOperationalSnapshot()),['vesta-flow-1.2.1-operational-spine'],{revalidate:snapshotRevalidateSeconds(),tags:['vesta-operational-spine']});
 
+type ManagerDelivery={key:string;manifest:any;items:any[]};
+let managerDeliveryCache:ManagerDelivery|null=null;
+let managerDeliveryRefresh:Promise<ManagerDelivery|null>|null=null;
+
+/** Read Render's compact published delivery. This avoids rebuilding the full
+ * FUB snapshot for every Flow request while retaining the existing fallback. */
+async function managerDelivery(config:ReturnType<typeof getConfig>):Promise<ManagerDelivery|null>{
+ if(!config.renderLearningUrl||!config.renderLearningKey)return null;
+ if(managerDeliveryRefresh)return managerDeliveryRefresh;
+ managerDeliveryRefresh=(async()=>{
+  try{
+   const headers={authorization:`Bearer ${config.renderLearningKey}`};
+   const response=await fetch(`${config.renderLearningUrl}/v1/manager-delivery`,{headers,cache:'no-store',signal:AbortSignal.timeout(8000)});
+   if(!response.ok)throw new Error(`manager delivery ${response.status}`);
+   const manifest=await response.json(),delivery=manifest?.delivery,version=String(delivery?.versionId||'');
+   const pageCount=Number(delivery?.pageCount||0);
+   if(!version||!Number.isInteger(pageCount)||pageCount<1)throw new Error('manager delivery is incomplete');
+   const pages=await Promise.all(Array.from({length:pageCount},(_,index)=>fetch(`${config.renderLearningUrl}/v1/manager-delivery/${encodeURIComponent(version)}/${index}`,{headers,cache:'force-cache',signal:AbortSignal.timeout(10000)}).then(async page=>{if(!page.ok)throw new Error(`manager page ${page.status}`);return page.json()})));
+   const items=pages.flatMap(page=>Array.isArray(page?.items)?page.items:[]),result={key:version,manifest,items};
+   managerDeliveryCache=result;return result;
+  }catch(error){console.warn('[flow] Render manager delivery unavailable; using cached/fallback spine.',error instanceof Error?error.message:error);return managerDeliveryCache}
+  finally{managerDeliveryRefresh=null}
+ })();
+ return managerDeliveryRefresh;
+}
+
+/** Fast path for Flow: consume Render's precompiled manager pages and only
+ * expose assigned contacts. The full operational spine remains available to
+ * cadence and as a transparent fallback when delivery is unavailable. */
+export async function getFlowSpine(){
+ if(shouldUseDemo())return getSpine();
+ const delivery=await managerDelivery(getConfig());
+ if(delivery){
+  const manifest=delivery.manifest;
+  const users:NormalizedUser[]=(manifest.users?.items||[]).map((item:any)=>normalizeUser(item)).map((user:NormalizedUser)=>({...user,isRoutingManager:isRoutingManagerUser(user)}));
+  const userMap=new Map<number,NormalizedUser>(users.map((x:NormalizedUser)=>[x.id,x]));
+  const tasks=(manifest.tasks?.items||[]).map((item:any)=>normalizeTask(item,userMap));
+  const items=delivery.items.filter((lead:any)=>lead.assignedUserId!==null);
+  return {ok:true,mode:'live' as const,people:{mode:'live' as const,items,pages:Number(manifest.people?.pages||1),cache:'render-delivery' as const,metadata:{snapshotId:manifest.delivery?.snapshotId,versionId:delivery.key,generatedAt:manifest.dataState?.snapshotGeneratedAt,sourceSyncedAt:manifest.dataState?.lastSyncedAt},visited:[],appointmentConnector:{available:true,pages:1,cache:'render-delivery' as const,visibility:'Render manager delivery',error:null}},users:{mode:'live' as const,items:users,pages:1,cache:'render-delivery' as const,metadata:{snapshotId:manifest.delivery?.snapshotId},visited:[]},tasks:{mode:'live' as const,items:tasks,pages:1,cache:'render-delivery' as const,metadata:{snapshotId:manifest.delivery?.snapshotId},visited:[]},policy:manifest.policy||{ok:true,mode:'render-delivery' as const,policyVersion:POLICY_VERSION},agents:agentRollups(items,users),dataState:{source:'render-delivery',snapshotId:manifest.delivery?.snapshotId,lastSyncedAt:manifest.dataState?.lastSyncedAt,snapshotGeneratedAt:manifest.dataState?.snapshotGeneratedAt,completeness:manifest.dataState?.completeness,cache:'render-delivery',refreshMode:'published-snapshot'},snapshot:{id:manifest.delivery?.snapshotId,versionId:delivery.key,generatedAt:manifest.dataState?.snapshotGeneratedAt,sourceSyncedAt:manifest.dataState?.lastSyncedAt,completeness:manifest.dataState?.completeness}};
+ }
+ return getSpine();
+}
+
 export async function getSpine(){
  if(shouldUseDemo()||!operationalSnapshotEnabled())return getLiveSpine();
  try{return await cachedOperationalSpine();}
@@ -91,11 +134,11 @@ export async function refreshOperationalLead(id:string|number,users:NormalizedUs
 // unavailable connector from a genuine successful response containing no rows.
 async function safeCollection(path:string){try{const r=await paginate<any>(path);return {ok:true,items:r.items,metadata:r.metadata,pages:r.pages};}catch(error){return {ok:false,items:[],error:error instanceof Error?error.message:'Unavailable'};}}
 export async function getLeadIntelligence(id:string){
- const spine=await getSpine();const lead=spine.people.items.find(x=>String(x.id)===String(id));if(!lead)throw new Error('Lead not found');
- const leadTasks=spine.tasks.items.filter(x=>String(x.personId)===String(id));
+ const spine=await getFlowSpine();const lead=spine.people.items.find((x:any)=>String(x.id)===String(id));if(!lead)throw new Error('Lead not found');
+ const leadTasks=spine.tasks.items.filter((x:any)=>String(x.personId)===String(id));
  if(spine.mode==='demo'){const collections={calls:[{id:1,created:new Date(Date.now()-2*86400000).toISOString(),type:'Outbound call',outcome:'Voicemail'}],textMessages:[{id:2,created:new Date(Date.now()-86400000).toISOString(),type:'Text',message:'Following up on your home search.'}],events:[{id:3,created:new Date().toISOString(),type:'Viewed property',description:'Viewed 3 West Loop listings'}],notes:[],appointments:[]};return {ok:true,mode:'demo',lead,tasks:leadTasks,collections,timeline:buildTimeline(lead,leadTasks,collections),appointmentAudit:auditAppointments(collections.appointments),listingProcess:listingProcess(lead.raw),decisionSnapshot:decisionSnapshot(lead)};}
  const personId=encodeURIComponent(id);const [person,allTasks,calls,textMessages,events,notes,appointments]=await Promise.all([fubRequest<any>(`/people/${personId}`),safeCollection(`/tasks?personId=${personId}`),safeCollection(`/calls?personId=${personId}`),safeCollection(`/textMessages?personId=${personId}`),safeCollection(`/events?personId=${personId}`),safeCollection(`/notes?personId=${personId}`),safeCollection(`/appointments?personId=${personId}`)]);
- const userMap=new Map(spine.users.items.map(x=>[x.id,x]));const detailTasks=allTasks.ok?allTasks.items.map(x=>normalizeTask(x,userMap)):leadTasks;
+ const userMap=new Map<number,NormalizedUser>(spine.users.items.map((x:any)=>[x.id,x]));const detailTasks=allTasks.ok?allTasks.items.map((x:any)=>normalizeTask(x,userMap)):leadTasks;
  const handRaiseNames=new Set(HAND_RAISE_TYPES.map(value=>value.toLowerCase())),eventTime=(item:any)=>item?.created||item?.createdAt||item?.occurredAt||item?.date||null;
  const handRaiseAt=events.items.filter((item:any)=>handRaiseNames.has(String(item?.type||item?.eventType||item?.name||'').trim().toLowerCase())).map(eventTime).filter(Boolean).sort((a:string,b:string)=>new Date(b).getTime()-new Date(a).getTime())[0]||null;
  const freshLead=applyRoutingContext(enrichLead({...normalizePersonBase(person.data,userMap),handRaiseAt},detailTasks,appointments.items.map(normalizeAppointment)));

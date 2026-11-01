@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest,NextResponse } from 'next/server';
-import { getSpine } from '@/lib/fub/service';
+import { getFlowSpine } from '@/lib/fub/service';
 import { discoverBrokers } from '@/lib/flow/brokers';
 import { appendFlowEvent,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
 import { sendManagementAlert } from '@/lib/flow/alerts';
@@ -15,7 +15,7 @@ export async function POST(request:NextRequest){
  try{
   const body=await request.json(),kind=body.kind as BrokerActionKind;
   if(!kinds.has(kind))return NextResponse.json({ok:false,error:'Invalid broker action.'},{status:400});
-  const spine=await getSpine();
+  const spine=await getFlowSpine();
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[];
   try{events=await listFlowEvents()}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'The live intelligence spine is connected, but action storage is unavailable. No action was recorded. Check the Render ledger connection and migration readiness in Vercel.'},{status:503})}
