@@ -32,6 +32,12 @@ VESTA_EMAIL_MODE=shadow
 VESTA_EMAIL_ALLOW_MANUAL=false
 VESTA_EMAIL_STORAGE_KEY=vesta:critical-email:v1
 FUB_WEB_BASE_URL=https://app.followupboss.com/2/people/view
+
+# FUB OAuth delegated access (create the client with the registered system).
+FUB_OAUTH_CLIENT_ID=...
+FUB_OAUTH_CLIENT_SECRET=...
+FUB_OAUTH_SESSION_SECRET=LONG_RANDOM_SESSION_SECRET
+FUB_OAUTH_REDIRECT_URI=https://vestaflow.vercel.app/api/auth/fub/callback
 ```
 
 `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` must be configured
