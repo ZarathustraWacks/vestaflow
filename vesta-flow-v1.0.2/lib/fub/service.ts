@@ -8,7 +8,7 @@ import { normalizeAppointment, normalizePersonBase, normalizeTask, normalizeUser
 import { enrichLead, agentRollups } from '@/lib/spine/governance';
 import { buildTimeline } from '@/lib/spine/timeline';
 import { NormalizedTask, NormalizedUser, NormalizedLead } from '@/lib/domain/types';
-import { scoreLeads } from '@/lib/learning/client';
+import { localScoreLeads,scoreLeads } from '@/lib/learning/client';
 import { auditAppointments } from '@/lib/policy/appointments';
 import { listingProcess } from '@/lib/integrations/listing';
 import { decisionSnapshot, POLICY_VERSION } from '@/lib/audit/snapshot';
@@ -60,7 +60,7 @@ async function compileOperationalSnapshot(snapshot:OperationalSnapshot){
  for(const item of snapshot.claimCallIndex||[]){const key=String((item as any).personId);if(!claimByPerson.has(key))claimByPerson.set(key,item);}
  const withEvidence=(item:any)=>{const id=String(item?.id??'');const communication=communicationByPerson.get(id);const evidenceSummary={communication:communication||null,behavior:behaviorByPerson.get(id)||null,claim:claimByPerson.get(id)||null};if(!communication)return {...item,vestaEvidence:evidenceSummary};const channel=String((communication as any).channel||'').toLowerCase(),at=(communication as any).lastCommunicationAt,baseCommunication={...(item.communication||{})};if(channel==='call')baseCommunication.lastOutgoingCall=at;if(channel==='text')baseCommunication.lastTextSentAt=at;if(channel==='email')baseCommunication.lastEmailSentAt=at;return {...item,communication:baseCommunication,vestaEvidence:evidenceSummary};};
  const normalized=snapshot.collections.people.map(withEvidence).map(item=>applyRoutingContext(enrichLead(normalizePersonBase(item,userMap),taskItems,appointmentItems)));
- const peopleItems=await attachLearning(normalized);
+ const localScores=localScoreLeads(normalized),peopleItems=normalized.map((lead,i)=>({...lead,learningScore:localScores[i]}));
  const people={mode:'live' as const,items:peopleItems,pages:Math.max(1,Math.ceil(peopleItems.length/100)),cache:'vercel-persistent',metadata:{snapshotId:snapshot.snapshotId,contractVersion:snapshot.contractVersion,counts:snapshot.counts},visited:[],appointmentConnector:{available:true,pages:Math.max(1,Math.ceil(appointmentItems.length/100)),cache:'render-snapshot',visibility:'Latest appointments present in the completed Render FUB mirror.',error:null}};
  const users={mode:'live' as const,items:userItems,pages:Math.max(1,Math.ceil(userItems.length/100)),cache:'vercel-persistent',metadata:{snapshotId:snapshot.snapshotId},visited:[]};
  const tasks={mode:'live' as const,items:taskItems,pages:Math.max(1,Math.ceil(taskItems.length/100)),cache:'vercel-persistent',metadata:{snapshotId:snapshot.snapshotId},visited:[]};
@@ -68,7 +68,7 @@ async function compileOperationalSnapshot(snapshot:OperationalSnapshot){
  return {ok:true,mode:'live' as const,people,users,tasks,policy,agents:agentRollups(peopleItems,userItems),dataState:{source:'render-snapshot',snapshotId:snapshot.snapshotId,lastSyncedAt:snapshot.sourceSyncedAt,snapshotGeneratedAt:snapshot.generatedAt,completeness:snapshot.completeness,cache:'vercel-persistent',refreshMode:'stale-while-revalidate',checkpoints:snapshot.checkpoints}};
 }
 
-const cachedOperationalSpine=unstable_cache(async()=>compileOperationalSnapshot(await fetchOperationalSnapshot()),['vesta-flow-1.2.0-operational-spine'],{revalidate:snapshotRevalidateSeconds(),tags:['vesta-operational-spine']});
+const cachedOperationalSpine=unstable_cache(async()=>compileOperationalSnapshot(await fetchOperationalSnapshot()),['vesta-flow-1.2.1-operational-spine'],{revalidate:snapshotRevalidateSeconds(),tags:['vesta-operational-spine']});
 
 export async function getSpine(){
  if(shouldUseDemo()||!operationalSnapshotEnabled())return getLiveSpine();
