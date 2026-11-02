@@ -14,7 +14,18 @@ export async function GET(request: NextRequest) {
   try {
     const token = await exchangeCode(code, state);
     const user = await fetchOAuthUser(token.access_token);
-    const session = sealSession({ accessToken: token.access_token, refreshToken: token.refresh_token || null, tokenType: token.token_type || 'Bearer', expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000, redirectUri: FUB_OAUTH_REDIRECT_URI, fubUser: user });
+    // Keep the browser session small and deterministic. FUB may add fields to
+    // /me over time; sealing the whole response can exceed cookie limits and
+    // cause the redirect back to Flow to lose the session entirely.
+    const fubUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isOwner: user.isOwner,
+      isActive: user.isActive,
+    };
+    const session = sealSession({ accessToken: token.access_token, refreshToken: token.refresh_token || null, tokenType: token.token_type || 'Bearer', expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000, redirectUri: FUB_OAUTH_REDIRECT_URI, fubUser });
     const destination = new URL('/', url.origin);
     destination.searchParams.set('fub', 'connected');
     const result = NextResponse.redirect(destination);
