@@ -11,7 +11,10 @@ export async function GET() {
     url.searchParams.set('client_id', clientId());
     url.searchParams.set('redirect_uri', FUB_OAUTH_REDIRECT_URI);
     url.searchParams.set('state', state);
-    url.searchParams.set('prompt', 'login');
+    // Let an already-authenticated FUB browser session continue through SSO.
+    // Forcing prompt=login made Safari invoke Passwords AutoFill every time a
+    // Flow session expired, leaving brokers at a credential prompt instead of
+    // returning to their workspace.
     const response = NextResponse.redirect(url);
     response.cookies.set('vesta_fub_oauth_state', state, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 600 });
     // Never leave a token-only or otherwise stale session in place while a
