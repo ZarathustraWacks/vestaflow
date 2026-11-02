@@ -13,7 +13,12 @@ function identityCandidates(value: unknown, depth = 0): Array<Record<string, unk
   return [record, ...nested];
 }
 export function isFubManager(session:FubSession|null):boolean {
-  return identityCandidates(session?.fubUser).some((user) => user.isOwner === true || String(user.role || '').toLowerCase() === 'broker');
+  return identityCandidates(session?.fubUser).some((user) => {
+    const role = String(user.role || '').toLowerCase();
+    // FUB's administrative identities have appeared as Owner, Admin, or
+    // Manager. A plain Broker/Agent must remain limited to assigned leads.
+    return user.isOwner === true || role.includes('owner') || role.includes('admin') || role.includes('manager');
+  });
 }
 export function sessionUserId(session:FubSession|null):number|null {
   for (const user of identityCandidates(session?.fubUser)) {
