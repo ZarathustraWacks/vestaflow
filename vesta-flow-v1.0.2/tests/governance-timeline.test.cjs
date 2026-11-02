@@ -192,6 +192,12 @@ test('completed flow item stays out until its intelligence snapshot changes',()=
   assert.equal(buildFlowQueue([{...lead,decisionSnapshotId:'changed'}],[event],7).length,1);
 });
 
+test('note-backed completion stays out when FUB writeback creates a new snapshot',()=>{
+  const lead=enrichLead(person({lastCommunication:iso(-.2)}),[normalizeTask({id:94,personId:42,name:'Follow up',dueDateTime:iso(.2),isCompleted:false},users)]);
+  const event={id:'complete-note-1',kind:'broker.complete',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,outcome:'Connected',note:'Spoke with the customer and scheduled the next step.'};
+  assert.equal(buildFlowQueue([{...lead,decisionSnapshotId:'changed'}],[event],7).length,0);
+});
+
 test('future skip hides an item and an expired skip returns it',()=>{
   const lead=enrichLead(person({lastCommunication:iso(-.2)}),[normalizeTask({id:92,personId:42,name:'Follow up',dueDateTime:iso(.2),isCompleted:false},users)]),base={id:'skip-1',kind:'broker.skip',leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:7,actorName:'Rental Agent',createdAt:new Date().toISOString(),recommendation:lead.decision.label,priority:lead.decision.urgency,reason:'Call later'};
   assert.equal(buildFlowQueue([lead],[{...base,returnAt:iso(1)}],7).length,0);

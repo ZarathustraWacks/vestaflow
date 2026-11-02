@@ -46,6 +46,13 @@ function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
  const pass=unresolvedPass(events);if(pass)return true;
  const nurture=events.find(event=>event.kind==='management.nurture');if(nurture&&(!nurture.returnAt||new Date(nurture.returnAt).getTime()>now))return true;
  const latest=events[0];if(!latest)return false;
+ // A broker's completed action may write a note back to FUB. That writeback
+ // changes the contact's updated timestamp and therefore produces a new
+ // intelligence snapshot, but it does not create a new item for the broker
+ // to work. Keep a note-backed completion suppressed across that snapshot
+ // boundary; completions without a note retain the original snapshot-bound
+ // behavior so genuinely changed intelligence can re-enter the queue.
+ if(latest.kind==='broker.complete'&&latest.note)return true;
  if(latest.decisionSnapshotId!==lead.decisionSnapshotId)return false;
  if(latest.kind==='broker.complete')return true;
  if(latest.kind==='broker.skip'&&latest.returnAt&&new Date(latest.returnAt).getTime()>now)return true;
