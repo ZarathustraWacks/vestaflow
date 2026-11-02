@@ -6,16 +6,18 @@ import { degradedFlowStorageStatus,flowStorageStatus,listFlowEvents } from '@/li
 import type { FlowEvent } from '@/lib/flow/types';
 import { completionWritebackStatus } from '@/lib/fub/writeback';
 import { isOperationalLead } from '@/lib/operational-eligibility';
-import { hasFubSession } from '@/lib/fub/session';
+import { getFubSession, isFubManager, sessionUserId } from '@/lib/fub/session';
 
 export async function GET(request:NextRequest){
- if(!hasFubSession(request))return NextResponse.json({ok:false,error:'FUB authorization required.'},{status:401});
+ const session=getFubSession(request); if(!session)return NextResponse.json({ok:false,error:'FUB authorization required.'},{status:401});
  try{
   const spine=await getFlowSpine();
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
   try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}
-  const requested=request.nextUrl.searchParams.get('brokerId'),brokerId=requested!==null&&requested!==''?Number(requested):(brokers[0]?.id??null);
+  const manager=isFubManager(session),ownId=sessionUserId(session); if(!manager&&!ownId)return NextResponse.json({ok:false,error:'FUB user identity is unavailable; sign in again.'},{status:403});
+  const requested=request.nextUrl.searchParams.get('brokerId'),requestedId=requested!==null&&requested!==''?Number(requested):null;
+  const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:(brokers[0]?.id??null)):ownId;
   const selectedBrokerId=Number.isFinite(brokerId as number)?brokerId:null;
   const queue=buildFlowQueue(spine.people.items,events,selectedBrokerId);
   const leadById=new Map(spine.people.items.map((lead:any)=>[String(lead.id),lead]));

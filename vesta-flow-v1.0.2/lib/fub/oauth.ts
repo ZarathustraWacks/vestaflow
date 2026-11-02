@@ -10,6 +10,7 @@ function required(name: string): string {
 
 export function clientId(): string { return required('FUB_OAUTH_CLIENT_ID'); }
 export function clientSecret(): string { return required('FUB_OAUTH_CLIENT_SECRET'); }
+export type FubOAuthUser = { id?: number|string; name?: string; email?: string; role?: string; isOwner?: boolean; isActive?: boolean };
 
 function sessionKey(): Buffer {
   return createHash('sha256').update(required('FUB_OAUTH_SESSION_SECRET')).digest();
@@ -51,4 +52,14 @@ export async function exchangeCode(code: string, state: string) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body?.access_token) throw new Error(String(body?.error_description || body?.message || 'FUB OAuth token exchange failed'));
   return body as { access_token: string; refresh_token?: string; expires_in?: number; token_type?: string };
+}
+
+export async function fetchOAuthUser(accessToken: string): Promise<FubOAuthUser> {
+  const headers:Record<string,string>={ authorization: `Bearer ${accessToken}`, accept: 'application/json' };
+  if(process.env.FUB_SYSTEM_NAME)headers['X-System']=process.env.FUB_SYSTEM_NAME;
+  if(process.env.FUB_SYSTEM_KEY)headers['X-System-Key']=process.env.FUB_SYSTEM_KEY;
+  const response = await fetch('https://api.followupboss.com/v1/me', { headers, cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body) throw new Error(String(body?.message || body?.errorMessage || 'Unable to resolve the FUB user identity'));
+  return body as FubOAuthUser;
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exchangeCode, equalSecret, FUB_OAUTH_REDIRECT_URI, sealSession } from '@/lib/fub/oauth';
+import { exchangeCode, equalSecret, fetchOAuthUser, FUB_OAUTH_REDIRECT_URI, sealSession } from '@/lib/fub/oauth';
 
 export const runtime = 'nodejs';
 
@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   if (responseStatus === 'denied' || !code) return NextResponse.json({ ok: false, error: 'FUB authorization was not approved' }, { status: 403 });
   try {
     const token = await exchangeCode(code, state);
-    const session = sealSession({ accessToken: token.access_token, refreshToken: token.refresh_token || null, tokenType: token.token_type || 'Bearer', expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000, redirectUri: FUB_OAUTH_REDIRECT_URI });
+    const user = await fetchOAuthUser(token.access_token);
+    const session = sealSession({ accessToken: token.access_token, refreshToken: token.refresh_token || null, tokenType: token.token_type || 'Bearer', expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000, redirectUri: FUB_OAUTH_REDIRECT_URI, fubUser: user });
     const destination = new URL('/', url.origin);
     destination.searchParams.set('fub', 'connected');
     const result = NextResponse.redirect(destination);
