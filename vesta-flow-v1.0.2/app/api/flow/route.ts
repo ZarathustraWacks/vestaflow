@@ -10,6 +10,7 @@ import { getFubSession, isFubManager, sessionUserId } from '@/lib/fub/session';
 
 export async function GET(request:NextRequest){
  const session=getFubSession(request); if(!session)return NextResponse.json({ok:false,error:'FUB authorization required.'},{status:401});
+ const manager=isFubManager(session),ownId=sessionUserId(session); if(!manager&&!ownId)return NextResponse.json({ok:false,error:'FUB user identity is unavailable; sign in again.'},{status:403});
  try{
   // Flow should consume Render's published manager delivery. The full FUB
   // spine remains the transparent fallback inside getFlowSpine, but the
@@ -18,7 +19,6 @@ export async function GET(request:NextRequest){
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
   try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}
-  const manager=isFubManager(session),ownId=sessionUserId(session); if(!manager&&!ownId)return NextResponse.json({ok:false,error:'FUB user identity is unavailable; sign in again.'},{status:403});
   const requested=request.nextUrl.searchParams.get('brokerId'),requestedId=requested!==null&&requested!==''?Number(requested):null;
   const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:(brokers[0]?.id??null)):ownId;
   const selectedBrokerId=Number.isFinite(brokerId as number)?brokerId:null;
