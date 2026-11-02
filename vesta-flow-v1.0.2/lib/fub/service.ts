@@ -115,8 +115,22 @@ async function managerDelivery(config:ReturnType<typeof getConfig>):Promise<Mana
 /** Fast path for Flow: consume Render's precompiled manager pages and only
  * expose assigned contacts. The full operational spine remains available to
  * cadence and as a transparent fallback when delivery is unavailable. */
-export async function getFlowSpine(){
+async function getBrokerFlowSpine(ownUserId:number){
+ const c=getConfig();
+ const [u,t,p]=await Promise.all([
+  rawUsers(),
+  paginate<any>(`/tasks?isCompleted=false&assignedUserId=${encodeURIComponent(String(ownUserId))}`),
+  paginate<any>(`/people?fields=allFields&includeTrash=true&assignedUserId=${encodeURIComponent(String(ownUserId))}`),
+ ]);
+ const users=u.items, userMap=new Map(users.map(x=>[x.id,x]));
+ const tasks=t.items.map(item=>normalizeTask(item,userMap));
+ const people=p.items.map(item=>applyRoutingContext(enrichLead(normalizePersonBase(item,userMap),tasks,[])));
+ return {ok:true,mode:'live' as const,people:{mode:'live' as const,items:people,pages:p.pages,cache:'fub-assigned' as const,metadata:p.metadata,visited:p.visited,appointmentConnector:{available:false,pages:0,cache:'miss' as const,visibility:'Appointments load when a selected contact is opened.',error:null}},users:{mode:'live' as const,items:users,pages:u.pages,cache:u.cache,metadata:u.metadata,visited:u.visited},tasks:{mode:'live' as const,items:tasks,pages:t.pages,cache:'miss' as const,metadata:t.metadata,visited:t.visited},policy:{ok:true,mode:'live' as const,policyVersion:POLICY_VERSION,smartLists:{items:[]},customFields:{items:[]},timeframes:{items:[]},appointmentTypes:{items:[]},appointmentOutcomes:{items:[]}},agents:agentRollups(people,users),dataState:{source:'fub-assigned',snapshotId:null,lastSyncedAt:new Date().toISOString(),snapshotGeneratedAt:new Date().toISOString(),completeness:'assigned-only',cache:'request',refreshMode:'assigned-fub'}};
+}
+
+export async function getFlowSpine(options:{ownUserId?:number|null;manager?:boolean}={}){
  if(shouldUseDemo())return getSpine();
+ if(options.ownUserId&&options.manager===false)return getBrokerFlowSpine(options.ownUserId);
  const delivery=await managerDelivery(getConfig());
  if(delivery){
   const manifest=delivery.manifest;
