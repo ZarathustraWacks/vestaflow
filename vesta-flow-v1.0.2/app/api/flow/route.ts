@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from 'next/server';
-import { getSpine,refreshOperationalLead } from '@/lib/fub/service';
+import { getFlowSpine,refreshOperationalLead } from '@/lib/fub/service';
 import { buildFlowQueue } from '@/lib/flow/engine';
 import { discoverBrokers } from '@/lib/flow/brokers';
 import { degradedFlowStorageStatus,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
@@ -11,7 +11,10 @@ import { getFubSession, isFubManager, sessionUserId } from '@/lib/fub/session';
 export async function GET(request:NextRequest){
  const session=getFubSession(request); if(!session)return NextResponse.json({ok:false,error:'FUB authorization required.'},{status:401});
  try{
-  const spine=await getSpine();
+  // Flow should consume Render's published manager delivery. The full FUB
+  // spine remains the transparent fallback inside getFlowSpine, but the
+  // normal request must not rebuild tens of thousands of contacts.
+  const spine=await getFlowSpine();
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
   try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}
