@@ -14,6 +14,10 @@ export async function GET() {
     url.searchParams.set('prompt', 'login');
     const response = NextResponse.redirect(url);
     response.cookies.set('vesta_fub_oauth_state', state, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 600 });
+    // Never leave a token-only or otherwise stale session in place while a
+    // new consent flow is running. The callback will replace it only after
+    // it has resolved the current FUB user's identity.
+    response.cookies.set('vesta_fub_session', '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0 });
     return response;
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'FUB OAuth is not configured' }, { status: 503 });
