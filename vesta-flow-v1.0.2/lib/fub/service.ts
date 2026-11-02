@@ -127,8 +127,15 @@ export async function getOperationalSpine(){const [people,users,tasks]=await Pro
 /** Re-read a candidate from FUB immediately before it can enter a live email. */
 export async function refreshOperationalLead(id:string|number,users:NormalizedUser[],tasks:NormalizedTask[]){
  if(shouldUseDemo())return getPeople({includeLearning:false}).then(result=>result.items.find(item=>String(item.id)===String(id))||null);
- const response=await fubRequest<any>(`/people/${encodeURIComponent(String(id))}`),userMap=new Map(users.map(user=>[user.id,user]));
- return applyRoutingContext(enrichLead(normalizePersonBase(response.data,userMap),tasks));
+ const personId=encodeURIComponent(String(id)),userMap=new Map(users.map(user=>[user.id,user]));
+ // Re-read only the selected contact and its open tasks after a broker action.
+ // This avoids waiting for the next shared Render snapshot cycle.
+ const [response,taskPage]=await Promise.all([
+  fubRequest<any>(`/people/${personId}`),
+  paginate<any>(`/tasks?personId=${personId}&isCompleted=false`),
+ ]);
+ const freshTasks=taskPage.items.map(item=>normalizeTask(item,userMap));
+ return applyRoutingContext(enrichLead(normalizePersonBase(response.data,userMap),freshTasks));
 }
 // Detail collections are independently fallible. `ok:false` distinguishes an
 // unavailable connector from a genuine successful response containing no rows.
