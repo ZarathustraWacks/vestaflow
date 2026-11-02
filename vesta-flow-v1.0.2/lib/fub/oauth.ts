@@ -65,10 +65,9 @@ export async function fetchOAuthUser(accessToken: string): Promise<FubOAuthUser>
   // Normalize them at the boundary so authorization never depends on a
   // particular response envelope or on whether the identifier is called id
   // or userId.
-  const candidate = (body.user && typeof body.user === 'object') ? body.user
-    : (body.data && typeof body.data === 'object') ? body.data
-    : body;
-  const id = candidate.id ?? candidate.userId ?? candidate.user_id;
+  const first = (body.data && typeof body.data === 'object') ? body.data : body;
+  const candidate = (first.user && typeof first.user === 'object') ? first.user : first;
+  const id = candidate.id ?? candidate.userId ?? candidate.user_id ?? candidate.userID ?? candidate.personId ?? candidate.ownerId;
   if (id === undefined || id === null || String(id).trim() === '') {
     throw new Error('FUB user identity unavailable from /me response');
   }
