@@ -35,7 +35,13 @@ export async function GET(request:NextRequest){
   // without turning every Flow request into a full FUB crawl.
   let queue=buildFlowQueue(people,events,selectedBrokerId);
   if(spine.mode==='live'&&queue.length){
-   const refreshed=(await Promise.all(queue.slice(0,3).map(item=>refreshOperationalLead(item.leadId,spine.users.items,spine.tasks.items).catch(()=>null)))).filter(Boolean) as any[];
+   // The queue must render before optional note enrichment. A slow FUB notes
+   // call must never consume the whole broker request budget.
+   const bounded=(item:any)=>Promise.race([
+    refreshOperationalLead(item.leadId,spine.users.items,spine.tasks.items).catch(()=>null),
+    new Promise<null>(resolve=>setTimeout(()=>resolve(null),2500)),
+   ]);
+   const refreshed=(await Promise.all(queue.slice(0,3).map(bounded))).filter(Boolean) as any[];
    if(refreshed.length){const byId=new Map(refreshed.map(item=>[String(item.id),item]));people=people.map((lead:any)=>byId.get(String(lead.id))||lead);queue=buildFlowQueue(people,events,selectedBrokerId);}
   }
   const leadById=new Map(people.map((lead:any)=>[String(lead.id),lead]));
