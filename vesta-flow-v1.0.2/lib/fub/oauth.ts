@@ -61,5 +61,16 @@ export async function fetchOAuthUser(accessToken: string): Promise<FubOAuthUser>
   const response = await fetch('https://api.followupboss.com/v1/me', { headers, cache: 'no-store', signal: AbortSignal.timeout(15_000) });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body) throw new Error(String(body?.message || body?.errorMessage || 'Unable to resolve the FUB user identity'));
-  return body as FubOAuthUser;
+  // FUB has returned both a flat /me object and wrapped variants over time.
+  // Normalize them at the boundary so authorization never depends on a
+  // particular response envelope or on whether the identifier is called id
+  // or userId.
+  const candidate = (body.user && typeof body.user === 'object') ? body.user
+    : (body.data && typeof body.data === 'object') ? body.data
+    : body;
+  const id = candidate.id ?? candidate.userId ?? candidate.user_id;
+  if (id === undefined || id === null || String(id).trim() === '') {
+    throw new Error('FUB user identity unavailable from /me response');
+  }
+  return { ...candidate, id } as FubOAuthUser;
 }
