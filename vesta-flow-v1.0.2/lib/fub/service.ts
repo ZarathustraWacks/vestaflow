@@ -16,6 +16,22 @@ import { HAND_RAISE_TYPES } from '@/lib/policy/vesta';
 import {applyRoutingContext,isRoutingManagerUser} from '@/lib/routing-managers';
 import {fetchOperationalSnapshot,operationalSnapshotEnabled,snapshotRevalidateSeconds,type OperationalSnapshot} from '@/lib/render/operational-snapshot';
 
+const noteDate=(note:any):string|null=>{for(const key of ['created','createdAt','date','timestamp','updatedAt']){const value=note?.[key];if(typeof value==='string'&&Number.isFinite(Date.parse(value)))return value;}return null;};
+const noteAuthorId=(note:any)=>Number(note?.userId??note?.createdById??note?.createdBy?.id??note?.author?.id);
+const noteAuthorName=(note:any)=>String(note?.userName??note?.createdBy?.name??note?.author?.name??'').trim().toLowerCase();
+/** Broker-authored FUB notes are accountable actions and reset cadence. */
+function applyBrokerCadenceNote(lead:any,notes:any[]){
+ const brokerId=Number(lead.assignedUserId),brokerName=String(lead.assignedUserName||'').trim().toLowerCase();
+ const candidates=notes.map(note=>({note,at:noteDate(note),authorId:noteAuthorId(note),authorName:noteAuthorName(note)})).filter(item=>item.at).filter(item=>{
+  const idKnown=Number.isFinite(item.authorId)&&item.authorId>0,nameKnown=Boolean(item.authorName);
+  return (idKnown&&item.authorId===brokerId)||(nameKnown&&brokerName&&item.authorName===brokerName)||(!idKnown&&!nameKnown);
+ }).sort((a,b)=>Date.parse(b.at!)-Date.parse(a.at!));
+ const latest=candidates[0];if(!latest)return lead;
+ const noteAt=latest.at!,current=lead.brokerOutreachAt||lead.lastCommunicationAt;
+ if(current&&Date.parse(current)>=Date.parse(noteAt))return lead;
+ return {...lead,lastCommunicationAt:noteAt,lastCommunicationSource:'fub-note',brokerOutreachAt:noteAt,cadenceNoteAt:noteAt,cadenceNoteText:String(latest.note?.body??latest.note?.text??latest.note?.note??'').trim()||null};
+}
+
 export async function identity(){if(shouldUseDemo())return {mode:'demo' as const,identity:{name:'Demo Brokerage',user:'Demo Broker'}};const r=await fubRequest<unknown>('/identity');return {mode:'live' as const,identity:r.data,rate:r.headers};}
 async function rawUsers(){const c=getConfig();const x=await cached('fub:users:v7-routing-managers',c.cacheTtl,async()=>{const r=await paginate<any>('/users');return {items:r.items.map(normalizeUser).map(user=>({...user,isRoutingManager:isRoutingManagerUser(user)})),pages:r.pages,rate:r.headers,metadata:r.metadata,visited:r.visited}});return {...x.value,cache:x.cache};}
 async function rawTasks(){const c=getConfig();const x=await cached('fub:tasks:v6',c.cacheTtl,async()=>{const r=await paginate<any>('/tasks?isCompleted=false');return {raw:r.items,pages:r.pages,rate:r.headers,metadata:r.metadata,visited:r.visited}});return {...x.value,cache:x.cache};}
@@ -130,12 +146,14 @@ export async function refreshOperationalLead(id:string|number,users:NormalizedUs
  const personId=encodeURIComponent(String(id)),userMap=new Map(users.map(user=>[user.id,user]));
  // Re-read only the selected contact and its open tasks after a broker action.
  // This avoids waiting for the next shared Render snapshot cycle.
- const [response,taskPage]=await Promise.all([
+ const [response,taskPage,notes]=await Promise.all([
   fubRequest<any>(`/people/${personId}`),
   paginate<any>(`/tasks?personId=${personId}&isCompleted=false`),
+  paginate<any>(`/notes?personId=${personId}`),
  ]);
  const freshTasks=taskPage.items.map(item=>normalizeTask(item,userMap));
- return applyRoutingContext(enrichLead(normalizePersonBase(response.data,userMap),freshTasks));
+ const base=normalizePersonBase(response.data,userMap),withNote=applyBrokerCadenceNote(base,notes.items||[]);
+ return applyRoutingContext(enrichLead(withNote,freshTasks));
 }
 // Detail collections are independently fallible. `ok:false` distinguishes an
 // unavailable connector from a genuine successful response containing no rows.

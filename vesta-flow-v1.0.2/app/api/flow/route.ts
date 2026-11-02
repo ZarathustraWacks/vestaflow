@@ -30,7 +30,14 @@ export async function GET(request:NextRequest){
     if(refreshed)people=people.map((lead:any)=>String(lead.id)===String(refreshId)?refreshed:lead);
    }catch(error){console.warn('[flow] selected-contact refresh unavailable',error instanceof Error?error.message:error)}
   }
-  const queue=buildFlowQueue(people,events,selectedBrokerId);
+  // Render's compact delivery omits full note bodies. Re-read only the
+  // visible top candidates so broker-authored cadence notes reset the clock
+  // without turning every Flow request into a full FUB crawl.
+  let queue=buildFlowQueue(people,events,selectedBrokerId);
+  if(spine.mode==='live'&&queue.length){
+   const refreshed=(await Promise.all(queue.slice(0,3).map(item=>refreshOperationalLead(item.leadId,spine.users.items,spine.tasks.items).catch(()=>null)))).filter(Boolean) as any[];
+   if(refreshed.length){const byId=new Map(refreshed.map(item=>[String(item.id),item]));people=people.map((lead:any)=>byId.get(String(lead.id))||lead);queue=buildFlowQueue(people,events,selectedBrokerId);}
+  }
   const leadById=new Map(people.map((lead:any)=>[String(lead.id),lead]));
   // The task list uses the same FUB/Render spine as cadence and Flow, giving
   // brokers a sortable personal view without creating a second source of truth.
