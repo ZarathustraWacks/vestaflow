@@ -119,7 +119,7 @@ async function getBrokerFlowSpine(ownUserId:number):Promise<any>{
  const c=getConfig();
  try{
   if(c.renderLearningUrl&&c.renderLearningKey){
-   const response=await fetch(`${c.renderLearningUrl}/v1/manager-delivery/assigned/${encodeURIComponent(String(ownUserId))}`,{headers:{authorization:`Bearer ${c.renderLearningKey}`},cache:'no-store',signal:AbortSignal.timeout(3000)});
+   const response=await fetch(`${c.renderLearningUrl}/v1/manager-delivery/assigned/${encodeURIComponent(String(ownUserId))}`,{headers:{authorization:`Bearer ${c.renderLearningKey}`},cache:'no-store',signal:AbortSignal.timeout(15000)});
    if(response.ok){
     const manifest=await response.json(),users:NormalizedUser[]=(manifest.users?.items||[]).map((item:any)=>normalizeUser(item)).map((user:NormalizedUser)=>({...user,isRoutingManager:isRoutingManagerUser(user)})),userMap=new Map(users.map((x:NormalizedUser)=>[x.id,x]));
     const tasks=(manifest.tasks?.items||[]).map((item:any)=>normalizeTask(item,userMap)),people=manifest.people?.items||[];
