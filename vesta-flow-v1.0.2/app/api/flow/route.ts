@@ -18,7 +18,7 @@ export async function GET(request:NextRequest){
   const spine=await getFlowSpine({ownUserId:ownId,manager});
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
-  try{events=await listFlowEvents()}catch{storage=degradedFlowStorageStatus()}
+  try{events=await listFlowEvents(1)}catch{storage=degradedFlowStorageStatus()}
   const requested=request.nextUrl.searchParams.get('brokerId'),requestedId=requested!==null&&requested!==''?Number(requested):null;
   const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:(brokers[0]?.id??null)):ownId;
   const selectedBrokerId=Number.isFinite(brokerId as number)?brokerId:null;
