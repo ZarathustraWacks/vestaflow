@@ -15,11 +15,11 @@ export async function GET(request:NextRequest){
   // Flow should consume Render's published manager delivery. The full FUB
   // spine remains the transparent fallback inside getFlowSpine, but the
   // normal request must not rebuild tens of thousands of contacts.
-  const spine=await getFlowSpine({ownUserId:ownId,manager});
+  const requested=request.nextUrl.searchParams.get('brokerId'),requestedId=requested!==null&&requested!==''?Number(requested):null;
+  const spine=await getFlowSpine({ownUserId:ownId,manager,brokerId:requestedId});
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
   try{events=await listFlowEvents(1)}catch{storage=degradedFlowStorageStatus()}
-  const requested=request.nextUrl.searchParams.get('brokerId'),requestedId=requested!==null&&requested!==''?Number(requested):null;
   const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:(brokers[0]?.id??null)):ownId;
   const selectedBrokerId=Number.isFinite(brokerId as number)?brokerId:null;
   const refreshId=request.nextUrl.searchParams.get('refreshLeadId');

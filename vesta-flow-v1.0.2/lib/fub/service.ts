@@ -142,9 +142,26 @@ async function getBrokerFlowSpine(ownUserId:number):Promise<any>{
  return {ok:true,mode:'live' as const,people:{mode:'live' as const,items:people,pages:p.pages,cache:'fub-assigned' as const,metadata:p.metadata,visited:p.visited,appointmentConnector:{available:false,pages:0,cache:'miss' as const,visibility:'Appointments load when a selected contact is opened.',error:null}},users:{mode:'live' as const,items:users,pages:u.pages,cache:u.cache,metadata:u.metadata,visited:u.visited},tasks:{mode:'live' as const,items:tasks,pages:t.pages,cache:'miss' as const,metadata:t.metadata,visited:t.visited},policy:{ok:true,mode:'live' as const,policyVersion:POLICY_VERSION,smartLists:{items:[]},customFields:{items:[]},timeframes:{items:[]},appointmentTypes:{items:[]},appointmentOutcomes:{items:[]}},agents:agentRollups(people,users),dataState:{source:'fub-assigned',snapshotId:null,lastSyncedAt:new Date().toISOString(),snapshotGeneratedAt:new Date().toISOString(),completeness:'assigned-only',cache:'request',refreshMode:'assigned-fub'}};
 }
 
-export async function getFlowSpine(options:{ownUserId?:number|null;manager?:boolean}={}):Promise<any>{
+export async function getFlowSpine(options:{ownUserId?:number|null;manager?:boolean;brokerId?:number|null}={}):Promise<any>{
  if(shouldUseDemo())return getSpine();
  if(options.ownUserId&&options.manager===false)return getBrokerFlowSpine(options.ownUserId);
+ // Managers need the full broker roster, but the initial queue only needs one
+ // selected broker. Read the compact manifest first, then use the indexed
+ // assigned endpoint instead of downloading every published page on startup.
+ if(options.manager){
+  const c=getConfig();
+  try{
+   if(c.renderLearningUrl&&c.renderLearningKey){
+    const response=await fetch(`${c.renderLearningUrl}/v1/manager-delivery`,{headers:{authorization:`Bearer ${c.renderLearningKey}`},cache:'no-store',signal:AbortSignal.timeout(8000)});
+    if(response.ok){
+     const manifest=await response.json(),users=(manifest.users?.items||[]).map((item:any)=>normalizeUser(item)).map((user:NormalizedUser)=>({...user,isRoutingManager:isRoutingManagerUser(user)}));
+     const configured=Number(options.brokerId);const rollups=Array.isArray(manifest.agents)?manifest.agents.filter((item:any)=>Number.isInteger(Number(item.id))&&Number(item.id)>0).sort((a:any,b:any)=>(Number(b.leads)||0)-(Number(a.leads)||0)):[];
+     const target=Number.isInteger(configured)&&configured>0?configured:(Number(rollups[0]?.id)||users.find((user:any)=>user.isActive&&['agent','broker'].some((role:string)=>String(user.role).toLowerCase().includes(role)))?.id||null);
+     if(target){const assigned=await getBrokerFlowSpine(target);if(assigned?.people?.items?.length||assigned?.users?.items?.length)return assigned;}
+    }
+   }
+  }catch(error){console.warn('[flow] Manager assigned delivery unavailable; using full manager delivery.',error instanceof Error?error.message:error)}
+ }
  const delivery=await managerDelivery(getConfig());
  if(delivery){
   const manifest=delivery.manifest;
