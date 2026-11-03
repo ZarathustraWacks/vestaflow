@@ -160,8 +160,16 @@ export async function getFlowSpine(options:{ownUserId?:number|null;manager?:bool
      if(target){const assigned=await getBrokerFlowSpine(target);if(assigned?.people?.items?.length||assigned?.users?.items?.length)return assigned;}
     }
    }
-  }catch(error){console.warn('[flow] Manager assigned delivery unavailable; using full manager delivery.',error instanceof Error?error.message:error)}
+ }catch(error){console.warn('[flow] Manager assigned delivery unavailable; using full manager delivery.',error instanceof Error?error.message:error)}
  }
+ // If the compact assigned publication is still catching up, serve the last
+ // valid operational snapshot before attempting any full delivery/FUB crawl.
+ // This keeps the manager workspace responsive and avoids turning a temporary
+ // Render indexing delay into the browser's 60-second timeout loop.
+ try{
+  const snapshot=await getSpine();
+  if(snapshot?.people?.items?.length||snapshot?.users?.items?.length)return snapshot;
+ }catch(error){console.warn('[flow] Operational snapshot unavailable; using full manager delivery.',error instanceof Error?error.message:error)}
  const delivery=await managerDelivery(getConfig());
  if(delivery){
   const manifest=delivery.manifest;
