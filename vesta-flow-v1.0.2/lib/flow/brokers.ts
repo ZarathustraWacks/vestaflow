@@ -18,3 +18,6 @@ export function discoverBrokers(leads:LeadOwner[],users:SpineUser[]):FlowBroker[
  }
  return [...brokers.values()].sort((a,b)=>a.name.localeCompare(b.name));
 }
+
+/** Match the initial selection to the broker whose assigned delivery was loaded. */
+export function initialFlowBrokerId(brokers:FlowBroker[]):number|null{return brokers.find(broker=>broker.leadCount>0)?.id??brokers[0]?.id??null;}

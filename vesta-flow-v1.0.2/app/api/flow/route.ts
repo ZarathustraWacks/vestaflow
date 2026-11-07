@@ -1,7 +1,7 @@
 import { NextRequest,NextResponse } from 'next/server';
 import { getFlowSpine,refreshOperationalLead } from '@/lib/fub/service';
 import { buildFlowQueue } from '@/lib/flow/engine';
-import { discoverBrokers } from '@/lib/flow/brokers';
+import { discoverBrokers,initialFlowBrokerId } from '@/lib/flow/brokers';
 import { degradedFlowStorageStatus,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
 import type { FlowEvent } from '@/lib/flow/types';
 import { completionWritebackStatus } from '@/lib/fub/writeback';
@@ -20,7 +20,7 @@ export async function GET(request:NextRequest){
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[]=[],storage=flowStorageStatus();
   try{events=await listFlowEvents(1)}catch{storage=degradedFlowStorageStatus()}
-  const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:(brokers[0]?.id??null)):ownId;
+  const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:initialFlowBrokerId(brokers)):ownId;
   const selectedBrokerId=Number.isFinite(brokerId as number)?brokerId:null;
   const refreshId=request.nextUrl.searchParams.get('refreshLeadId');
   let people:any[]=spine.people.items;
