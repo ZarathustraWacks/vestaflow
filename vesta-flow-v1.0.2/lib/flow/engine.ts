@@ -12,7 +12,8 @@ function latestOwnership(lead:any,events:FlowEvent[]){
 function priorityScore(lead:any){
  const urgency=({Immediate:400,Today:300,'This week':200,Monitor:100} as Record<string,number>)[lead.decision?.urgency]||0;
  const risk=({Critical:80,High:60,Medium:30,Healthy:0} as Record<string,number>)[lead.riskLevel]||0;
- const sla=lead.responseSlaStatus==='pending'?90:lead.responseSlaStatus==='breached'?75:0;
+ const operationalSla=lead.operationalResponseSlaStatus??lead.responseSlaStatus;
+ const sla=operationalSla==='pending'?90:operationalSla==='breached'?75:0;
  const cadence=lead.cadenceStatus==='overdue'?50:lead.cadenceStatus==='due'?25:0;
  const confirmation=(lead.operationalClocks||[]).some((item:any)=>item.key==='appointment-confirmation'&&['pending','breached'].includes(item.status))?110:0;
  // Cadence is also an opportunity signal: recent customer activity, a near

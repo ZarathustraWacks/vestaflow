@@ -1,10 +1,12 @@
-import {isOperationalLead} from '@/lib/operational-eligibility';
 /** Derive governance evidence, scores, rollups, and stable decision snapshots. */
 import { createHash } from 'node:crypto';
 import { GovernanceSignal, NormalizedAppointment, NormalizedLead, NormalizedTask, NormalizedUser,OperationalClock } from '@/lib/domain/types';
 import { cadencePolicy, cadenceState } from '@/lib/policy/vesta';
 import { decideLead } from '@/lib/spine/decision';
 import {addCentralBusinessMinutes} from '@/lib/policy/business-time';
+import {brokerActionAt as resolveBrokerActionAt} from '@/lib/policy/communication';
+import {POLICY_VERSION} from '@/lib/audit/snapshot';
+import {isOperationalLead} from '@/lib/operational-eligibility';
 
 const DAY=86400000;
 const timestamp=(value:string|null,endOfDate=false)=>{if(!value)return null;const dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(value);const parsed=new Date(dateOnly&&endOfDate?`${value}T23:59:59.999`:value).getTime();return Number.isFinite(parsed)?parsed:null};
@@ -24,7 +26,7 @@ function clock(key:OperationalClock['key'],label:string,dueAt:number|null,cleare
  return {key,label,status,dueAt:dueAt===null?null:new Date(dueAt).toISOString(),clearedAt:clearedAt===null?null:new Date(clearedAt).toISOString(),clearingAction,policyStatus};
 }
 
-export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'cadenceKey'|'cadenceLabel'|'cadenceStatus'|'cadenceDueAt'|'cadenceDaysLate'|'cadenceClearRequired'|'overdueTaskCount'|'responseSlaStatus'|'decisionSnapshotId'|'governanceScore'|'governanceSignals'|'riskLevel'|'riskReasons'|'recommendedAction'|'decision'>,tasks:NormalizedTask[]=[],appointments:NormalizedAppointment[]=[]):NormalizedLead{
+export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'cadenceKey'|'cadenceLabel'|'cadenceStatus'|'cadenceDueAt'|'cadenceDaysLate'|'cadenceClearRequired'|'overdueTaskCount'|'responseSlaStatus'|'decisionSnapshotId'|'governanceScore'|'governanceSignals'|'riskLevel'|'riskReasons'|'recommendedAction'|'decision'>,tasks:NormalizedTask[]=[],appointments:NormalizedAppointment[]=[],appointmentCollectionAvailable=appointments.length>0):NormalizedLead{
  const created=ageDays(base.createdAt),activity=ageDays(base.lastActivityAt),comm=ageDays(base.lastCommunicationAt),now=Date.now();
  const openTasks=tasks.filter(t=>String(t.personId)===String(base.id)&&!t.isCompleted);
  const futureTasks=openTasks.map(t=>({due:t.dueAt,at:timestamp(t.dueAt,true)})).filter((t):t is {due:string;at:number}=>t.due!==null&&t.at!==null&&t.at>=now).sort((a,b)=>a.at-b.at);
@@ -38,13 +40,16 @@ export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'
  const ageBand=created<=7?'Fresh':created<=30?'Developing':created<=90?'Aged':created<=365?'Old':'Legacy';
  const engagementBand=activity===99999?'Unknown':activity<=7?'Active now':activity<=30?'Recently active':activity<=90?'Cooling':'Dormant';
  const policy=cadencePolicy({lane:base.leadLane,stage:base.stage,tags:base.tags,timeframeStatus:base.timeframeStatus});
- const brokerActionAt=base.brokerOutreachAt||(String(base.lastCommunicationSource||'').startsWith('two-way-')?null:base.lastCommunicationAt);
- const cadence=cadenceState(policy,base.lastCommunicationAt,now),sla=responseSla(base.handRaiseAt,brokerActionAt,now);
+ const brokerActionAt=resolveBrokerActionAt(base);
+ const cadence=cadenceState(policy,base.lastCommunicationAt,now),operationalSla=isOperationalLead(base)?responseSla(base.handRaiseAt,brokerActionAt,now):'not-applicable';
+ // Current-owner and aggregate communication fields cannot prove broker liability.
+ // Keep the lead-level follow-up clock while withholding broker compliance.
+ const sla:NormalizedLead['responseSlaStatus']=isOperationalLead(base)&&base.handRaiseAt?'unknown':'not-applicable';
  const raised=timestamp(base.handRaiseAt),contacted=timestamp(base.lastCommunicationAt),brokerAction=timestamp(brokerActionAt),contactAfterRaise=raised!==null&&brokerAction!==null&&brokerAction>=raised?brokerAction:null,appointment=timestamp(nextAppointmentAt),cadenceDue=timestamp(cadence.dueAt);
  const operationalClocks:OperationalClock[]=[
   clock('route-acceptance','Route acceptance',raised===null?null:raised+5*60000,null,'Accept or decline the routed lead.','ambiguous',now),
   clock('initial-acknowledgement','Initial acknowledgement',raised===null?null:addCentralBusinessMinutes(raised,1),contactAfterRaise,'Send the approved acknowledgement.','proposed',now),
-  clock('first-contact-attempt','First contact attempt',raised===null?null:addCentralBusinessMinutes(raised,240),contactAfterRaise,'Log a qualifying outbound call, text, or email.','approved',now),
+  clock('first-contact-attempt','Lead follow-up clock (not broker compliance)',raised===null?null:addCentralBusinessMinutes(raised,240),contactAfterRaise,'Log a qualifying outbound call, text, or email.','approved',now),
   clock('meaningful-contact','Meaningful contact',raised===null?null:addCentralBusinessMinutes(raised,240),null,'Record a connected conversation or documented disposition.','proposed',now),
   clock('appointment-confirmation','Appointment confirmation',appointment===null?null:appointment-2*3600000,null,'Confirm the appointment through an approved channel.','approved',now),
   clock('ongoing-cadence','Ongoing cadence',cadenceDue,cadence.status==='current'||cadence.status==='not-required'?contacted:null,'Complete and document the required follow-up.','approved',now),
@@ -59,19 +64,19 @@ export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'
   {key:'task-hygiene',label:'One-off task hygiene',status:overdueTaskCount>0?'fail':taskRepairRecommended?'warn':'pass',points:overdueTaskCount===0?15:0,maxPoints:15,explanation:overdueTaskCount>0?`${overdueTaskCount} overdue one-off task(s) must be cleared.`:taskRepairRecommended?`A future appointment is visible for ${new Date(nextAppointmentAt!).toLocaleString('en-US')}, but no future FUB task is visible. Treat the appointment as the next planned action and review whether a matching task should be created.`:'No overdue one-off tasks are visible.'},
  ];
  const score=signals.reduce((sum,signal)=>sum+signal.points,0),reasons=signals.filter(signal=>signal.status==='fail').map(signal=>signal.explanation);
- if(sla==='breached')reasons.unshift('A documented hand raise missed the four-hour first-contact standard.');
+ if(operationalSla==='breached')reasons.unshift('This lead needs response review; broker responsibility is not established.');
  const riskLevel=reasons.length>=3||(base.assignedUserId===null&&ageBand==='Fresh')?'Critical':reasons.length>=2?'High':reasons.length===1||score<80?'Medium':'Healthy';
- const action=!classificationClear?'Review and confirm the lead lane in Follow Up Boss.':base.assignedUserId===null?'Assign an accountable agent now.':sla==='pending'||sla==='breached'?'Respond to the active hand raise now.':cadence.status==='overdue'||cadence.status==='due'?'Restore the approved Smart List cadence.':overdueTaskCount>0?'Clear the overdue one-off task and document the outcome.':taskRepairRecommended?'Review the future appointment and create a matching follow-up task if the workflow requires one.':riskLevel==='Healthy'?'Continue the current follow-up plan.':'Review the record and correct the highlighted governance gaps.';
- const evidenceWarnings=[!base.lastCommunicationSource&&base.lastCommunicationAt?'Communication date lacks channel provenance.':'',base.nextAppointmentAt&&!appointments.length?'Appointment came from the person summary; calendar visibility was not independently confirmed.':''].filter(Boolean);
+ const action=!isOperationalLead(base)?'Preserve for historical evidence or a separately approved campaign.':!classificationClear?'Review and confirm the lead lane in Follow Up Boss.':base.assignedUserId===null?'Assign an accountable agent now.':operationalSla==='pending'||operationalSla==='breached'?'Respond to the active hand raise now.':cadence.status==='overdue'||cadence.status==='due'?'Restore the approved Smart List cadence.':overdueTaskCount>0?'Clear the overdue one-off task and document the outcome.':taskRepairRecommended?'Review the future appointment and create a matching follow-up task if the workflow requires one.':riskLevel==='Healthy'?'Continue the current follow-up plan.':'Review the record and correct the highlighted governance gaps.';
+ const evidenceWarnings=[!base.lastCommunicationSource&&base.lastCommunicationAt?'Communication date lacks channel provenance.':'',base.nextAppointmentAt&&!appointmentCollectionAvailable?'Appointment came from the person summary; calendar visibility was not independently confirmed.':''].filter(Boolean);
  const rentalEnrolled=base.leadLane==='renter'&&base.tags.some(tag=>/renter[- ]to[- ]buyer|renter conversion|future buyer/i.test(tag)),rentalDue=contacted===null?null:contacted+15*DAY;
  const rentalConversion={enrolled:rentalEnrolled,status:!rentalEnrolled?'not-enrolled' as const:rentalDue===null?'overdue' as const:now<rentalDue?'current' as const:now-rentalDue<DAY?'due' as const:'overdue' as const,dueAt:rentalDue===null?null:new Date(rentalDue).toISOString(),basis:'Six touches across a three-month renter-to-buyer nurture window; separate from active rental operations.'};
- const draft={...base,nextTaskAt,nextAppointmentAt,nextActionAt,nextActionSource,taskRepairRecommended,ageBand,engagementBand,cadenceKey:policy.key,cadenceLabel:policy.label,cadenceStatus:cadence.status,cadenceDueAt:cadence.dueAt,cadenceDaysLate:cadence.daysLate,cadenceClearRequired:policy.clearRequired,overdueTaskCount,responseSlaStatus:sla,operationalClocks,policyVersion:'vesta-departments-2026-09-shadow-v1',evidenceWarnings,rentalConversion,governanceScore:score,governanceSignals:signals,riskLevel,riskReasons:reasons,recommendedAction:action} as Omit<NormalizedLead,'decision'|'decisionSnapshotId'>;
- const decision=decideLead(draft),decisionSnapshotId=createHash('sha256').update(JSON.stringify({policy:'vesta-departments-2026-09-shadow-v1',id:base.id,updatedAt:base.updatedAt,lane:base.leadLane,stage:base.stage,cadence:cadence.status,sla,score,nextActionAt,nextActionSource,decision:decision.matchedRule})).digest('hex').slice(0,24);
+ const draft={...base,nextTaskAt,nextAppointmentAt,nextActionAt,nextActionSource,taskRepairRecommended,ageBand,engagementBand,cadenceKey:policy.key,cadenceLabel:policy.label,cadenceStatus:cadence.status,cadenceDueAt:cadence.dueAt,cadenceDaysLate:cadence.daysLate,cadenceClearRequired:policy.clearRequired,overdueTaskCount,responseSlaStatus:sla,operationalResponseSlaStatus:operationalSla,brokerAccountabilityStatus:'unavailable' as const,operationalClocks,policyVersion:POLICY_VERSION,evidenceWarnings,rentalConversion,governanceScore:score,governanceSignals:signals,riskLevel,riskReasons:reasons,recommendedAction:action} as Omit<NormalizedLead,'decision'|'decisionSnapshotId'>;
+ const decision=decideLead(draft),decisionSnapshotId=createHash('sha256').update(JSON.stringify({policy:POLICY_VERSION,id:base.id,updatedAt:base.updatedAt,lane:base.leadLane,stage:base.stage,cadence:cadence.status,sla,score,nextActionAt,nextActionSource,decision:decision.matchedRule})).digest('hex').slice(0,24);
  return {...draft,decision,decisionSnapshotId};
 }
 
 export function agentRollups(leads:NormalizedLead[],users:NormalizedUser[]){
  const map=new Map<number|null,{id:number|null;name:string;role:string;items:NormalizedLead[]}>();
- for(const lead of leads.filter(isOperationalLead)){const key=lead.assignedUserId,user=key!==null?users.find(item=>item.id===key):undefined,group=map.get(key)||{id:key,name:user?.name||lead.assignedUserName||'Unassigned',role:user?.role||lead.assignedUserRole||'Unknown',items:[]};group.items.push(lead);map.set(key,group)}
- return [...map.values()].map(group=>({id:group.id,name:group.name,role:group.role,leads:group.items.length,fresh:group.items.filter(item=>item.ageBand==='Fresh').length,critical:group.items.filter(item=>item.riskLevel==='Critical').length,noNext:group.items.filter(item=>item.cadenceStatus==='due'||item.cadenceStatus==='overdue').length,stale:group.items.filter(item=>item.engagementBand==='Dormant').length,averageScore:Math.round(group.items.reduce((sum,item)=>sum+item.governanceScore,0)/Math.max(1,group.items.length))})).sort((a,b)=>b.leads-a.leads);
+ for(const lead of leads){if(!isOperationalLead(lead))continue;const key=lead.assignedUserId,user=key!==null?users.find(item=>item.id===key):undefined,group=map.get(key)||{id:key,name:user?.name||lead.assignedUserName||'Unassigned',role:user?.role||lead.assignedUserRole||'Unknown',items:[]};group.items.push(lead);map.set(key,group)}
+ return [...map.values()].map(group=>({id:group.id,name:group.name,role:group.role,leads:group.items.length,fresh:group.items.filter(item=>item.ageBand==='Fresh').length,critical:group.items.filter(item=>item.riskLevel==='Critical').length,noNext:group.items.filter(item=>item.cadenceStatus==='due'||item.cadenceStatus==='overdue').length,stale:group.items.filter(item=>item.engagementBand==='Dormant').length,averageScoreBasis:'portfolio-health' as const,averageScore:Math.round(group.items.reduce((sum,item)=>sum+item.governanceScore,0)/Math.max(1,group.items.length))})).sort((a,b)=>b.leads-a.leads);
 }

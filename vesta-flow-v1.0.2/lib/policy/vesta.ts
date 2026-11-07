@@ -1,14 +1,16 @@
-import {isSuppressedOperationalStage} from '@/lib/operational-eligibility';
 /** Versioned SOP-derived operating lanes, cadence rules, and response standards. */
+import {isSuppressedOperationalStage} from '@/lib/operational-eligibility';
 export type LeadLane='buyer'|'seller'|'renter'|'candidate-rental'|'needs-classification';
 export type CadenceStatus='current'|'due'|'overdue'|'not-required'|'unknown';
 export interface CadencePolicy {key:string;label:string;days:number|null;clearRequired:boolean;basis:string;}
 
 const lower=(value:unknown)=>typeof value==='string'?value.trim().toLowerCase():'';
 const has=(tags:string[],pattern:RegExp)=>tags.some(tag=>pattern.test(lower(tag)));
+/** Current FUB labels and retained legacy aliases share the approved SOP lane. */
+export const policyStage=(value:unknown)=>{const stage=lower(value).replace(/\s+/g,' ');return ({'spoke with customer':'spoke with','met with customer':'appointment met','showing buyers':'showing homes','offers submitted':'submitting offers','offer submitted':'submitting offers','submitted offers':'submitting offers'} as Record<string,string>)[stage]||stage};
 
 export function resolveLane(input:{stage:string;source:string;tags:string[]}){
- const stage=lower(input.stage),source=lower(input.source),tags=input.tags||[];
+ const stage=policyStage(input.stage),source=lower(input.source),tags=input.tags||[];
  const renterStage=stage==='renter';
  const seller=has(tags,/(^|\b)seller(s)?(\b|$)/);
  const explicitRental=has(tags,/(^|\b)(rent|rental|rentals|renter|renters|tenant|tenants|lease|leasing)(\b|$)/);
@@ -24,9 +26,9 @@ export function resolveLane(input:{stage:string;source:string;tags:string[]}){
 }
 
 export function cadencePolicy(input:{lane:LeadLane;stage:string;tags:string[];timeframeStatus?:string|null}):CadencePolicy{
- const stage=lower(input.stage),tags=input.tags||[],timeframe=lower(input.timeframeStatus);
+ const stage=policyStage(input.stage),tags=input.tags||[],timeframe=lower(input.timeframeStatus);
  const none=(key:string,label:string,basis:string):CadencePolicy=>({key,label,days:null,clearRequired:false,basis});
- if(isSuppressedOperationalStage(input.stage))return none('suppressed-operational-stage','Inactive operating record','Retained for history and campaign review; excluded from active cadence.');
+ if(isSuppressedOperationalStage(stage))return none('operationally-suppressed',stage==='cold leads'?'AI campaign holding':'Inactive record',stage==='cold leads'?'Cold Leads remain available for future AI campaigns, but broker ownership and live cadence do not apply.':'Trash, Deleted, and Archived contacts remain available for historical learning and Data Management review, but are excluded from live cadence.');
  if(input.lane==='needs-classification'||input.lane==='candidate-rental')return none('classification-review','Classification review','Lane must be confirmed before cadence can be trusted.');
  if(input.lane==='renter')return none('renter','Renters','SOP frequency is N/A.');
  if(input.lane==='seller'){

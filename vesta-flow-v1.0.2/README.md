@@ -163,3 +163,24 @@ broker and never receives confidential manager notes. A broker can see targets,
 weekly progress, evidence links, coaching actions, acknowledge the plan, or
 request a metric correction. Production rollout must bind `brokerId` to the
 authenticated broker identity; the current selector remains a demo limitation.
+
+## November 6 cadence policy parity
+
+Fallback normalization, governance, decision lineage and queue ranking now use
+`vesta-cadence-2026-11-06-v2`, matching the coordinated Manager/Render release.
+Broker outreach and customer replies remain separate: outreach earns cadence
+credit without an answer, and a later paired reply may restart cadence. The
+lead follow-up clock drives urgency while broker responsibility stays unverified.
+Current stage aliases retain their approved cadence; inactive records remain
+outside live queues and Closed records retain past-client cadence.
+
+Detail reloads preserve documented inquiries even when event history is empty.
+A note counts as broker effort only when its author matches the visible broker;
+an anonymous note or a conflicting author ID cannot manufacture broker credit.
+This does not certify historical ownership or responsibility.
+
+The critical digest requires a documented inquiry and the shared four-business-hour
+deadline; creation alone and a customer reply cannot satisfy that obligation.
+Broker-specific published delivery, durable action recording, note writeback,
+authentication and deployment flags are retained. A fresh Render publication is
+still required before the published-data path carries the new policy.

@@ -12,25 +12,12 @@ import { localScoreLeads,scoreLeads } from '@/lib/learning/client';
 import { auditAppointments } from '@/lib/policy/appointments';
 import { listingProcess } from '@/lib/integrations/listing';
 import { decisionSnapshot, POLICY_VERSION } from '@/lib/audit/snapshot';
-import { HAND_RAISE_TYPES } from '@/lib/policy/vesta';
+import {latestHandRaiseAt} from '@/lib/policy/hand-raise';
+import {newestCommunicationDate} from '@/lib/policy/communication';
+import {applyBrokerCadenceNote} from '@/lib/policy/broker-note';
 import {applyRoutingContext,isRoutingManagerUser} from '@/lib/routing-managers';
 import {fetchOperationalSnapshot,operationalSnapshotEnabled,snapshotRevalidateSeconds,type OperationalSnapshot} from '@/lib/render/operational-snapshot';
 
-const noteDate=(note:any):string|null=>{for(const key of ['created','createdAt','date','timestamp','updatedAt']){const value=note?.[key];if(typeof value==='string'&&Number.isFinite(Date.parse(value)))return value;}return null;};
-const noteAuthorId=(note:any)=>Number(note?.userId??note?.createdById??note?.createdBy?.id??note?.author?.id);
-const noteAuthorName=(note:any)=>String(note?.userName??note?.createdBy?.name??note?.author?.name??'').trim().toLowerCase();
-/** Broker-authored FUB notes are accountable actions and reset cadence. */
-function applyBrokerCadenceNote(lead:any,notes:any[]){
- const brokerId=Number(lead.assignedUserId),brokerName=String(lead.assignedUserName||'').trim().toLowerCase();
- const candidates=notes.map(note=>({note,at:noteDate(note),authorId:noteAuthorId(note),authorName:noteAuthorName(note)})).filter(item=>item.at).filter(item=>{
-  const idKnown=Number.isFinite(item.authorId)&&item.authorId>0,nameKnown=Boolean(item.authorName);
-  return (idKnown&&item.authorId===brokerId)||(nameKnown&&brokerName&&item.authorName===brokerName)||(!idKnown&&!nameKnown);
- }).sort((a,b)=>Date.parse(b.at!)-Date.parse(a.at!));
- const latest=candidates[0];if(!latest)return lead;
- const noteAt=latest.at!,current=lead.brokerOutreachAt||lead.lastCommunicationAt;
- if(current&&Date.parse(current)>=Date.parse(noteAt))return lead;
- return {...lead,lastCommunicationAt:noteAt,lastCommunicationSource:'fub-note',brokerOutreachAt:noteAt,cadenceNoteAt:noteAt,cadenceNoteText:String(latest.note?.body??latest.note?.text??latest.note?.note??'').trim()||null};
-}
 
 export async function identity(){if(shouldUseDemo())return {mode:'demo' as const,identity:{name:'Demo Brokerage',user:'Demo Broker'}};const r=await fubRequest<unknown>('/identity');return {mode:'live' as const,identity:r.data,rate:r.headers};}
 async function rawUsers(){const c=getConfig();const x=await cached('fub:users:v7-routing-managers',c.cacheTtl,async()=>{const r=await paginate<any>('/users');return {items:r.items.map(normalizeUser).map(user=>({...user,isRoutingManager:isRoutingManagerUser(user)})),pages:r.pages,rate:r.headers,metadata:r.metadata,visited:r.visited}});return {...x.value,cache:x.cache};}
@@ -84,7 +71,7 @@ async function compileOperationalSnapshot(snapshot:OperationalSnapshot){
  return {ok:true,mode:'live' as const,people,users,tasks,policy,agents:agentRollups(peopleItems,userItems),dataState:{source:'render-snapshot',snapshotId:snapshot.snapshotId,lastSyncedAt:snapshot.sourceSyncedAt,snapshotGeneratedAt:snapshot.generatedAt,completeness:snapshot.completeness,cache:'vercel-persistent',refreshMode:'stale-while-revalidate',checkpoints:snapshot.checkpoints}};
 }
 
-const cachedOperationalSpine=unstable_cache(async()=>compileOperationalSnapshot(await fetchOperationalSnapshot()),['vesta-flow-1.2.1-operational-spine'],{revalidate:snapshotRevalidateSeconds(),tags:['vesta-operational-spine']});
+const cachedOperationalSpine=unstable_cache(async()=>compileOperationalSnapshot(await fetchOperationalSnapshot()),['vesta-flow-cadence-2026-11-06-v2'],{revalidate:snapshotRevalidateSeconds(),tags:['vesta-operational-spine']});
 
 type ManagerDelivery={key:string;manifest:any;items:any[]};
 let managerDeliveryCache:ManagerDelivery|null=null;
@@ -217,9 +204,9 @@ export async function getLeadIntelligence(id:string){
  if(spine.mode==='demo'){const collections={calls:[{id:1,created:new Date(Date.now()-2*86400000).toISOString(),type:'Outbound call',outcome:'Voicemail'}],textMessages:[{id:2,created:new Date(Date.now()-86400000).toISOString(),type:'Text',message:'Following up on your home search.'}],events:[{id:3,created:new Date().toISOString(),type:'Viewed property',description:'Viewed 3 West Loop listings'}],notes:[],appointments:[]};return {ok:true,mode:'demo',lead,tasks:leadTasks,collections,timeline:buildTimeline(lead,leadTasks,collections),appointmentAudit:auditAppointments(collections.appointments),listingProcess:listingProcess(lead.raw),decisionSnapshot:decisionSnapshot(lead)};}
  const personId=encodeURIComponent(id);const [person,allTasks,calls,textMessages,events,notes,appointments]=await Promise.all([fubRequest<any>(`/people/${personId}`),safeCollection(`/tasks?personId=${personId}`),safeCollection(`/calls?personId=${personId}`),safeCollection(`/textMessages?personId=${personId}`),safeCollection(`/events?personId=${personId}`),safeCollection(`/notes?personId=${personId}`),safeCollection(`/appointments?personId=${personId}`)]);
  const userMap=new Map<number,NormalizedUser>(spine.users.items.map((x:any)=>[x.id,x]));const detailTasks=allTasks.ok?allTasks.items.map((x:any)=>normalizeTask(x,userMap)):leadTasks;
- const handRaiseNames=new Set(HAND_RAISE_TYPES.map(value=>value.toLowerCase())),eventTime=(item:any)=>item?.created||item?.createdAt||item?.occurredAt||item?.date||null;
- const handRaiseAt=events.items.filter((item:any)=>handRaiseNames.has(String(item?.type||item?.eventType||item?.name||'').trim().toLowerCase())).map(eventTime).filter(Boolean).sort((a:string,b:string)=>new Date(b).getTime()-new Date(a).getTime())[0]||null;
- const noteAware=applyBrokerCadenceNote({...normalizePersonBase(person.data,userMap),handRaiseAt},notes.items||[]);
+ const normalizedPerson=normalizePersonBase(person.data,userMap);
+ const handRaiseAt=latestHandRaiseAt(newestCommunicationDate(normalizedPerson.handRaiseAt,lead.handRaiseAt),events.items||[]);
+ const noteAware=applyBrokerCadenceNote({...normalizedPerson,handRaiseAt},notes.items||[]);
  const freshLead=applyRoutingContext(enrichLead(noteAware,detailTasks,appointments.items.map(normalizeAppointment)));
  const enriched={...freshLead,learningScore:lead.learningScore};const collections={calls:calls.items,textMessages:textMessages.items,events:events.items,notes:notes.items,appointments:appointments.items};return {ok:true,mode:'live',lead:enriched,tasks:detailTasks,collections,timeline:buildTimeline(enriched,detailTasks,collections),rawPerson:person.data,availability:{tasks:allTasks,calls,textMessages,events,notes,appointments},appointmentAudit:auditAppointments(appointments.items),listingProcess:listingProcess(person.data),decisionSnapshot:decisionSnapshot(enriched)};
 }

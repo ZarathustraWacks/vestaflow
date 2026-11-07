@@ -34,6 +34,8 @@ const explicitlyInboundObjectDate=(value:unknown):string|null=>{
 };
 const newest=<T extends string>(candidates:{source:T;at:string|null}[])=>candidates.filter(candidate=>candidate.at&&Number.isFinite(Date.parse(candidate.at))).sort((a,b)=>Date.parse(b.at!)-Date.parse(a.at!))[0]||null;
 
+const latestFieldDate=(...values:unknown[])=>newest(values.map(value=>({source:'field',at:objectDate(value)})))?.at||null;
+
 /**
  * Keep broker effort and customer engagement on separate clocks.
  * Outreach resets cadence without requiring a reply. A later customer reply
@@ -41,17 +43,17 @@ const newest=<T extends string>(candidates:{source:T;at:string|null}[])=>candida
  */
 export function resolveCadenceCommunication(p:any):{at:string|null;source:CommunicationSource;brokerOutreachAt:string|null;customerResponseAt:string|null;customerResponseSource:CustomerResponseSource;twoWayEngagementAt:string|null}{
   const outreach=newest([
-    {source:'outbound-call',at:objectDate(p.lastOutgoingCall??p.lastOutboundCallAt??p.communication?.lastOutgoingCall??p.communication?.lastOutboundCallAt)},
-    {source:'outbound-email',at:objectDate(p.lastEmailSentAt??p.lastOutboundEmailAt??p.lastSentEmail??p.emailLastSentAt??p.communication?.lastEmailSentAt)},
-    {source:'outbound-text',at:objectDate(p.lastTextSentAt??p.lastOutboundTextAt??p.lastSentText??p.textLastSentAt??p.lastSmsSentAt??p.communication?.lastTextSentAt)},
+    {source:'outbound-call',at:latestFieldDate(p.lastOutgoingCall,p.lastOutboundCallAt,p.communication?.lastOutgoingCall,p.communication?.lastOutboundCallAt)},
+    {source:'outbound-email',at:latestFieldDate(p.lastEmailSentAt,p.lastOutboundEmailAt,p.lastSentEmail,p.emailLastSentAt,p.communication?.lastEmailSentAt)},
+    {source:'outbound-text',at:latestFieldDate(p.lastTextSentAt,p.lastOutboundTextAt,p.lastSentText,p.textLastSentAt,p.lastSmsSentAt,p.communication?.lastTextSentAt)},
     {source:'email',at:explicitlyOutboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
     {source:'text',at:explicitlyOutboundObjectDate(p.lastText??p.communication?.lastText)},
     {source:'outbound-call',at:explicitlyOutboundObjectDate(p.lastCall??p.communication?.lastCall)},
   ] as {source:Exclude<CommunicationSource,null>;at:string|null}[]);
   const response=newest([
-    {source:'inbound-call',at:objectDate(p.lastIncomingCall??p.lastInboundCallAt??p.lastReceivedCall??p.callLastReceivedAt??p.communication?.lastIncomingCall??p.communication?.lastInboundCallAt)},
-    {source:'inbound-email',at:objectDate(p.lastEmailReceivedAt??p.lastInboundEmailAt??p.lastReceivedEmail??p.emailLastReceivedAt??p.communication?.lastEmailReceivedAt)},
-    {source:'inbound-text',at:objectDate(p.lastTextReceivedAt??p.lastInboundTextAt??p.lastReceivedText??p.textLastReceivedAt??p.lastSmsReceivedAt??p.communication?.lastTextReceivedAt)},
+    {source:'inbound-call',at:latestFieldDate(p.lastIncomingCall,p.lastInboundCallAt,p.lastReceivedCall,p.callLastReceivedAt,p.communication?.lastIncomingCall,p.communication?.lastInboundCallAt)},
+    {source:'inbound-email',at:latestFieldDate(p.lastEmailReceivedAt,p.lastInboundEmailAt,p.lastReceivedEmail,p.emailLastReceivedAt,p.communication?.lastEmailReceivedAt)},
+    {source:'inbound-text',at:latestFieldDate(p.lastTextReceivedAt,p.lastInboundTextAt,p.lastReceivedText,p.textLastReceivedAt,p.lastSmsReceivedAt,p.communication?.lastTextReceivedAt)},
     {source:'inbound-call',at:explicitlyInboundObjectDate(p.lastCall??p.communication?.lastCall)},
     {source:'inbound-email',at:explicitlyInboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
     {source:'inbound-text',at:explicitlyInboundObjectDate(p.lastText??p.communication?.lastText)},
@@ -60,7 +62,7 @@ export function resolveCadenceCommunication(p:any):{at:string|null;source:Commun
   // Retain a legacy aggregate only when explicit effort is absent and the
   // aggregate is not the known customer-response timestamp. Consumers can
   // identify this weaker evidence by its fub-last-communication source.
-  const aggregate=objectDate(p.lastCommunication??p.lastCommunicationAt);
+  const aggregate=latestFieldDate(p.lastCommunication,p.lastCommunicationAt);
   const responseTime=response?.at?Date.parse(response.at):null;
   const legacy=newest([{source:'fub-last-communication' as const,at:aggregate},{source:'fub-contacted' as const,at:objectDate(p.contacted)}].filter(row=>row.at!==null&&(responseTime===null||Date.parse(row.at)!==responseTime)));
   const effective=paired?{source:response!.source.replace('inbound-','two-way-') as CommunicationSource,at:response!.at}:outreach||legacy;

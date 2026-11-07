@@ -20,6 +20,7 @@ export interface NormalizedLead {
   emails:string[]; phones:string[]; tags:string[]; price:number|null; collaborators:string[];
   ageBand:'Fresh'|'Developing'|'Aged'|'Old'|'Legacy'; engagementBand:'Active now'|'Recently active'|'Cooling'|'Dormant'|'Unknown';
   cadenceKey:string; cadenceLabel:string; cadenceStatus:CadenceStatus; cadenceDueAt:string|null; cadenceDaysLate:number|null; cadenceClearRequired:boolean; overdueTaskCount:number;
+  operationalResponseSlaStatus?:'met'|'breached'|'pending'|'not-applicable'|'unknown'; brokerAccountabilityStatus?:'unavailable'|'verified';
   handRaiseAt:string|null; responseSlaStatus:'met'|'breached'|'pending'|'not-applicable'|'unknown'; decisionSnapshotId:string;
   operationalClocks?:OperationalClock[];policyVersion?:string;evidenceWarnings?:string[];
   rentalConversion?:{enrolled:boolean;status:'current'|'due'|'overdue'|'not-enrolled';dueAt:string|null;basis:string};

@@ -1,3 +1,5 @@
+import {brokerActionAt} from '@/lib/policy/communication';
+import {addCentralBusinessMinutes} from '@/lib/policy/business-time';
 import {isOperationalLead} from '@/lib/operational-eligibility';
 import type { ManagementException } from '@/lib/flow/types';
 
@@ -38,14 +40,15 @@ export function morningCandidates(exceptions:ManagementException[],now=new Date(
 export function afternoonCandidates(leads:any[],now=new Date()):CriticalCandidate[]{
  const today=localParts(now).date;
  return leads.flatMap(lead=>{
-  const actionableAt=lead.handRaiseAt||lead.createdAt;if(!actionableAt||!inLocalWindow(actionableAt,today,9,13)||!active(lead))return [];
-  const actionable=new Date(actionableAt),deadline=new Date(actionable.getTime()+4*3600000),hoursOverdue=(now.getTime()-deadline.getTime())/3600000;
+  const actionableAt=lead.handRaiseAt;if(!actionableAt||!inLocalWindow(actionableAt,today,9,13)||!active(lead))return [];
+  const actionable=new Date(actionableAt),deadlineAt=addCentralBusinessMinutes(actionable,240);if(deadlineAt===null)return [];
+  const deadline=new Date(deadlineAt),hoursOverdue=(now.getTime()-deadline.getTime())/3600000;
   if(hoursOverdue<0)return [];
-  const effort=lead.brokerOutreachAt||(String(lead.lastCommunicationSource||'').startsWith('two-way-')?null:lead.lastCommunicationAt);const communicated=effort&&new Date(effort).getTime()>=actionable.getTime();if(communicated)return [];
-  const critical=lead.decision?.urgency==='Immediate'||lead.riskLevel==='Critical'||lead.responseSlaStatus==='breached';if(!critical)return [];
-  return [{key:`critical:${lead.id}:${actionable.toISOString()}`,leadId:String(lead.id),leadName:lead.name,ownerName:lead.assignedUserName,source:lead.source,segment:lead.leadLane,actionableAt:actionable.toISOString(),deadlineAt:deadline.toISOString(),hoursOverdue,recommendation:lead.decision?.label||lead.recommendedAction||'Contact immediately',reason:lead.decision?.rationale||'Critical lead has no visible qualifying contact.',governanceScore:lead.governanceScore,fubUrl:`${webBase()}/${lead.id}`,evidence:['Critical existing-spine decision','Four-hour threshold elapsed','No qualifying communication after actionable time'],origin:'existing-raven' as const}];
+  const effort=brokerActionAt(lead);const communicated=effort&&new Date(effort).getTime()>=actionable.getTime();if(communicated)return [];
+  const critical=lead.decision?.urgency==='Immediate'||lead.riskLevel==='Critical'||(lead.operationalResponseSlaStatus??lead.responseSlaStatus)==='breached';if(!critical)return [];
+  return [{key:`critical:${lead.id}:${actionable.toISOString()}`,leadId:String(lead.id),leadName:lead.name,ownerName:lead.assignedUserName,source:lead.source,segment:lead.leadLane,actionableAt:actionable.toISOString(),deadlineAt:deadline.toISOString(),hoursOverdue,recommendation:lead.decision?.label||lead.recommendedAction||'Contact immediately',reason:lead.decision?.rationale||'Critical lead has no visible qualifying contact.',governanceScore:lead.governanceScore,fubUrl:`${webBase()}/${lead.id}`,evidence:['Critical existing-spine decision','Four-business-hour follow-up window elapsed; broker responsibility unverified','No qualifying communication after actionable time'],origin:'existing-raven' as const}];
  });
 }
 
-export function stillUncontacted(candidate:CriticalCandidate,lead:any){const communication=lead?.brokerOutreachAt||(String(lead?.lastCommunicationSource||'').startsWith('two-way-')?null:lead?.lastCommunicationAt);return !communication||new Date(communication).getTime()<new Date(candidate.actionableAt).getTime()}
+export function stillUncontacted(candidate:CriticalCandidate,lead:any){const communication=lead?brokerActionAt(lead):null;return !communication||new Date(communication).getTime()<new Date(candidate.actionableAt).getTime()}
 export function localRunKey(kind:CriticalRunKind,now=new Date(),policyVersion='critical-actions-v1'){return `${localParts(now).date}:${kind}:${policyVersion}`}

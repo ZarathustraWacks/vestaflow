@@ -136,8 +136,10 @@ test('four-business-hour first-contact clock applies only to a documented hand r
   const pending=enrichLead(person({lastInquiry:new Date(Date.now()-30000).toISOString(),lastCommunication:null}),[]);
   const breached=enrichLead(person({lastInquiry:new Date(Date.now()-4*86400000).toISOString(),lastCommunication:null}),[]);
   const ordinary=enrichLead(person({lastInquiry:null,lastCommunication:null,stage:'Renter',tags:['Rental']}),[]);
-  assert.equal(pending.responseSlaStatus,'pending');
-  assert.equal(breached.responseSlaStatus,'breached');
+  assert.equal(pending.operationalResponseSlaStatus,'pending');
+  assert.equal(pending.responseSlaStatus,'unknown');
+  assert.equal(breached.operationalResponseSlaStatus,'breached');
+  assert.equal(breached.responseSlaStatus,'unknown');
   assert.equal(ordinary.responseSlaStatus,'not-applicable');
   assert.equal(pending.operationalClocks.find(item=>item.key==='first-contact-attempt').policyStatus,'approved');
 });
@@ -147,7 +149,8 @@ test('an on-time qualifying contact clears the first-contact clock',()=>{
   const contacted=new Date(Date.now()-3600000).toISOString();
   const lead=enrichLead(person({lastInquiry:raised,lastCommunication:contacted}),[]);
   const clock=lead.operationalClocks.find(item=>item.key==='first-contact-attempt');
-  assert.equal(lead.responseSlaStatus,'met');
+  assert.equal(lead.operationalResponseSlaStatus,'met');
+  assert.equal(lead.responseSlaStatus,'unknown');
   assert.equal(clock.status,'met');
 });
 
@@ -254,7 +257,7 @@ test('previous business day rolls Monday back to Friday',()=>{
 
 test('afternoon critical digest includes only leads whose four-hour mark elapsed',()=>{
   const now=new Date('2026-08-18T19:30:00Z'),base={id:1,name:'Lead',stage:'Lead',source:'Website',leadLane:'buyer',assignedUserName:'Agent',governanceScore:20,riskLevel:'Critical',responseSlaStatus:'breached',decision:{urgency:'Immediate',label:'Contact now',rationale:'No contact'}};
-  const candidates=afternoonCandidates([{...base,id:1,createdAt:'2026-08-18T14:00:00Z',lastCommunicationAt:null},{...base,id:2,createdAt:'2026-08-18T16:00:00Z',lastCommunicationAt:null},{...base,id:3,createdAt:'2026-08-18T14:00:00Z',lastCommunicationAt:'2026-08-18T15:00:00Z'}],now);
+  const candidates=afternoonCandidates([{...base,id:1,handRaiseAt:'2026-08-18T14:00:00Z',lastCommunicationAt:null},{...base,id:2,handRaiseAt:'2026-08-18T16:00:00Z',lastCommunicationAt:null},{...base,id:3,handRaiseAt:'2026-08-18T14:00:00Z',lastCommunicationAt:'2026-08-18T15:00:00Z'}],now);
   assert.deepEqual(candidates.map(x=>x.leadId),['1']);
 });
 
