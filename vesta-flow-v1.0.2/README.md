@@ -184,3 +184,6 @@ deadline; creation alone and a customer reply cannot satisfy that obligation.
 Broker-specific published delivery, durable action recording, note writeback,
 authentication and deployment flags are retained. A fresh Render publication is
 still required before the published-data path carries the new policy.
+
+### Flow accelerator delivery
+Set server-only `VESTA_FLOW_ACCELERATOR_URL`, `VESTA_FLOW_ACCELERATOR_READ_KEY`, and `VESTA_FLOW_ACCELERATOR_REFRESH_KEY` in the Flow Vercel project. Delivery reads prefer this connection and fall back to the existing Render connection. Successful durable completions queue a contact refresh after the response; completion still requires the existing FUB note confirmation and durable ledger. Keep all existing learning, ledger, PIP and coaching URLs/keys unchanged. No broker assignments or cadence rules change.

@@ -1,3 +1,4 @@
+import {fetchFlowDelivery} from '@/lib/render/flow-accelerator';
 /** Assemble normalized FUB collections into the auditable management spine. */
 import {unstable_cache} from 'next/cache';
 import { cached } from '@/lib/cache/memory';
@@ -80,17 +81,17 @@ let managerDeliveryRefresh:Promise<ManagerDelivery|null>|null=null;
 /** Read Render's compact published delivery. This avoids rebuilding the full
  * FUB snapshot for every Flow request while retaining the existing fallback. */
 async function managerDelivery(config:ReturnType<typeof getConfig>):Promise<ManagerDelivery|null>{
- if(!config.renderLearningUrl||!config.renderLearningKey)return null;
+ if(!process.env.VESTA_FLOW_ACCELERATOR_URL&&(!config.renderLearningUrl||!config.renderLearningKey))return null;
  if(managerDeliveryRefresh)return managerDeliveryRefresh;
  managerDeliveryRefresh=(async()=>{
   try{
    const headers={authorization:`Bearer ${config.renderLearningKey}`};
-   const response=await fetch(`${config.renderLearningUrl}/v1/manager-delivery`,{headers,cache:'no-store',signal:AbortSignal.timeout(8000)});
+   const response=await fetchFlowDelivery('/v1/manager-delivery');
    if(!response.ok)throw new Error(`manager delivery ${response.status}`);
    const manifest=await response.json(),delivery=manifest?.delivery,version=String(delivery?.versionId||'');
    const pageCount=Number(delivery?.pageCount||0);
    if(!version||!Number.isInteger(pageCount)||pageCount<1)throw new Error('manager delivery is incomplete');
-   const pages=await Promise.all(Array.from({length:pageCount},(_,index)=>fetch(`${config.renderLearningUrl}/v1/manager-delivery/${encodeURIComponent(version)}/${index}`,{headers,cache:'force-cache',signal:AbortSignal.timeout(10000)}).then(async page=>{if(!page.ok)throw new Error(`manager page ${page.status}`);return page.json()})));
+   const pages=await Promise.all(Array.from({length:pageCount},(_,index)=>fetchFlowDelivery(`/v1/manager-delivery/${encodeURIComponent(version)}/${index}`,'force-cache').then(async page=>{if(!page.ok)throw new Error(`manager page ${page.status}`);return page.json()})));
    const items=pages.flatMap(page=>Array.isArray(page?.items)?page.items:[]),result={key:version,manifest,items};
    managerDeliveryCache=result;return result;
   }catch(error){console.warn('[flow] Render manager delivery unavailable; using cached/fallback spine.',error instanceof Error?error.message:error);return managerDeliveryCache}
@@ -105,8 +106,8 @@ async function managerDelivery(config:ReturnType<typeof getConfig>):Promise<Mana
 async function getBrokerFlowSpine(ownUserId:number):Promise<any>{
  const c=getConfig();
  try{
-  if(c.renderLearningUrl&&c.renderLearningKey){
-   const response=await fetch(`${c.renderLearningUrl}/v1/manager-delivery/assigned/${encodeURIComponent(String(ownUserId))}`,{headers:{authorization:`Bearer ${c.renderLearningKey}`},cache:'no-store',signal:AbortSignal.timeout(15000)});
+  if(process.env.VESTA_FLOW_ACCELERATOR_URL||(c.renderLearningUrl&&c.renderLearningKey)){
+   const response=await fetchFlowDelivery(`/v1/manager-delivery/assigned/${encodeURIComponent(String(ownUserId))}`);
    if(response.ok){
     const manifest=await response.json(),users:NormalizedUser[]=(manifest.users?.items||[]).map((item:any)=>normalizeUser(item)).map((user:NormalizedUser)=>({...user,isRoutingManager:isRoutingManagerUser(user)})),userMap=new Map(users.map((x:NormalizedUser)=>[x.id,x]));
     const tasks=(manifest.tasks?.items||[]).map((item:any)=>normalizeTask(item,userMap)),people=manifest.people?.items||[];
@@ -138,8 +139,8 @@ export async function getFlowSpine(options:{ownUserId?:number|null;manager?:bool
  if(options.manager){
   const c=getConfig();
   try{
-   if(c.renderLearningUrl&&c.renderLearningKey){
-    const response=await fetch(`${c.renderLearningUrl}/v1/manager-delivery`,{headers:{authorization:`Bearer ${c.renderLearningKey}`},cache:'no-store',signal:AbortSignal.timeout(8000)});
+   if(process.env.VESTA_FLOW_ACCELERATOR_URL||(c.renderLearningUrl&&c.renderLearningKey)){
+    const response=await fetchFlowDelivery('/v1/manager-delivery');
     if(response.ok){
      const manifest=await response.json(),users=(manifest.users?.items||[]).map((item:any)=>normalizeUser(item)).map((user:NormalizedUser)=>({...user,isRoutingManager:isRoutingManagerUser(user)}));
      const configured=Number(options.brokerId);const rollups=Array.isArray(manifest.agents)?manifest.agents.filter((item:any)=>Number.isInteger(Number(item.id))&&Number(item.id)>0).sort((a:any,b:any)=>(Number(b.leads)||0)-(Number(a.leads)||0)):[];

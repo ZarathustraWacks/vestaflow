@@ -1,5 +1,6 @@
+import {enqueueFlowContactRefresh} from '@/lib/render/flow-accelerator';
 import { randomUUID } from 'node:crypto';
-import { NextRequest,NextResponse } from 'next/server';
+import { after,NextRequest,NextResponse } from 'next/server';
 import { getFlowSpine } from '@/lib/fub/service';
 import { discoverBrokers } from '@/lib/flow/brokers';
 import { appendFlowEvent,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
@@ -17,12 +18,14 @@ export async function POST(request:NextRequest){
  try{
   const body=await request.json(),kind=body.kind as BrokerActionKind;
   if(!kinds.has(kind))return NextResponse.json({ok:false,error:'Invalid broker action.'},{status:400});
-  const spine=await getFlowSpine();
+  const ownId=sessionUserId(session),manager=isFubManager(session);
+  const requestedBroker=manager?Number(body.actorUserId):ownId;
+  const spine=await getFlowSpine({ownUserId:ownId,manager,brokerId:requestedBroker});
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[];
   try{events=await listFlowEvents()}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'The live intelligence spine is connected, but action storage is unavailable. No action was recorded. Check the Render ledger connection and migration readiness in Vercel.'},{status:503})}
   const lead=spine.people.items.find((item:any)=>String(item.id)===String(body.leadId));if(!lead)return NextResponse.json({ok:false,error:'Lead not found.'},{status:404});
-  const ownId=sessionUserId(session);if(!isFubManager(session)&&(!ownId||lead.assignedUserId!==ownId))return NextResponse.json({ok:false,error:'This contact is assigned to another broker.'},{status:403});
+  if(!isFubManager(session)&&(!ownId||lead.assignedUserId!==ownId))return NextResponse.json({ok:false,error:'This contact is assigned to another broker.'},{status:403});
   const actorId=isFubManager(session)?Number(body.actorUserId):ownId,actor=brokers.find(user=>user.id===actorId);if(!actor)return NextResponse.json({ok:false,error:'Select a valid broker.'},{status:400});
   const outcome=text(body.outcome),reason=text(body.reason),note=text(body.note),returnAt=text(body.returnAt);
   if(kind==='broker.complete'&&!outcome)return NextResponse.json({ok:false,error:'A completion outcome is required.'},{status:400});
@@ -37,6 +40,7 @@ export async function POST(request:NextRequest){
   const reportedAction=kind==='broker.complete'?outcome:kind==='broker.skip'?'skip':kind==='broker.pass'?'pass':kind,verificationStatus=kind==='broker.complete'?(sync?'reported-note-readback':'unverified'):'reported';
   const event:FlowEvent={id:randomUUID(),kind,leadId:String(lead.id),decisionSnapshotId:lead.decisionSnapshotId,actorUserId:actor.id,actorName:actor.name,createdAt:new Date().toISOString(),recommendation:lead.decision.label,recommendationShown:lead.decision.label,selectedAction:reportedAction,reportedAction,verificationStatus,priority:lead.decision.urgency,...(outcome?{outcome}:{}),...(reason?{reason}:{}),...(note?{note}:{}),...(returnAt?{returnAt}:{}),metadata:{lane:lead.leadLane,cadenceStatus:lead.cadenceStatus,governanceScore:lead.governanceScore,learningScore:lead.learningScore?.score??null,policyVersion:lead.policyVersion,operationalClocks:lead.operationalClocks,choicesShown:choicesShownDetails,...(sync?{fubSync:sync}:{})}};
   try{await appendFlowEvent(event)}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'The action could not be stored, so it was not applied. Restore the Render ledger connection and try again.'},{status:503})}
+  if(kind==='broker.complete')after(()=>enqueueFlowContactRefresh(String(lead.id)).then(()=>{}));
   const priorSkips=events.filter(item=>item.kind==='broker.skip'&&item.leadId===event.leadId&&item.decisionSnapshotId===event.decisionSnapshotId).length,alertTrigger=kind==='broker.pass'?'broker-pass':kind==='broker.skip'&&(lead.decision.urgency==='Immediate'||priorSkips>=2)?(priorSkips>=2?'repeated-skip':'immediate-item-skipped'):null;
   const alert=alertTrigger?await sendManagementAlert(event,lead,alertTrigger):{configured:Boolean(process.env.VESTA_MANAGEMENT_ALERT_WEBHOOK),delivered:false,message:'No immediate management alert was required.'};
   const telemetry=await sendFlowTelemetry({decision_id:event.id,lead_id:event.leadId,snapshot_id:event.decisionSnapshotId,actor_id:String(actor.id),created_at:event.createdAt,choices:choicesShownDetails,recommendation_shown:lead.decision.label,selected_action:reportedAction,reported_action:reportedAction,verification_status:verificationStatus,selected_at:event.createdAt,outcome:{disposition:kind,outcome,reason,note,fubSync:sync,policyVersion:lead.policyVersion}});
