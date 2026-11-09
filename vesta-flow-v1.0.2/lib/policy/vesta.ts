@@ -28,7 +28,7 @@ export function resolveLane(input:{stage:string;source:string;tags:string[]}){
 export function cadencePolicy(input:{lane:LeadLane;stage:string;tags:string[];timeframeStatus?:string|null}):CadencePolicy{
  const stage=policyStage(input.stage),tags=input.tags||[],timeframe=lower(input.timeframeStatus);
  const none=(key:string,label:string,basis:string):CadencePolicy=>({key,label,days:null,clearRequired:false,basis});
- if(isSuppressedOperationalStage(stage))return none('operationally-suppressed',stage==='cold leads'?'AI campaign holding':'Inactive record',stage==='cold leads'?'Cold Leads remain available for future AI campaigns, but broker ownership and live cadence do not apply.':'Trash, Deleted, and Archived contacts remain available for historical learning and Data Management review, but are excluded from live cadence.');
+ if(isSuppressedOperationalStage(stage))return none('operationally-suppressed',stage==='recruiting'?'Recruiting — not a lead':stage==='cold leads'?'AI campaign holding':'Inactive record',stage==='recruiting'?'Recruiting contacts are excluded from customer lead operations and remain available in source records.':stage==='cold leads'?'Cold Leads remain available for future AI campaigns, but broker ownership and live cadence do not apply.':'Trash, Deleted, and Archived contacts remain available for historical learning and Data Management review, but are excluded from live cadence.');
  if(input.lane==='needs-classification'||input.lane==='candidate-rental')return none('classification-review','Classification review','Lane must be confirmed before cadence can be trusted.');
  if(input.lane==='renter')return none('renter','Renters','SOP frequency is N/A.');
  if(input.lane==='seller'){

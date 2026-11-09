@@ -19,3 +19,13 @@ test('suppression, skip, kill, pass and assigned broker safeguards survive prior
 test('an explicitly skipped Closed task respects its return time',()=>{assert.equal(buildFlowQueue([lead({stage:'Closed',overdueTaskCount:1})],[{id:'skip',leadId:'42',kind:'broker.skip',createdAt:ago(.1),decisionSnapshotId:'v1',returnAt:future(1)}],7).length,0)});
 
 test('planning Done outcomes cannot hide an uncontacted buyer obligation',()=>{for(const outcome of ['Follow-up task created','Follow-up scheduled','Appointment confirmed']){const q=buildFlowQueue([lead()],[{id:'plan',leadId:'42',kind:'broker.complete',outcome,note:'Planning only',createdAt:ago(.01),decisionSnapshotId:'v1'}],7);assert.equal(q.length,1);assert.equal(q[0].relationship.needsContactNow,true)}});
+
+
+test('Recruiting contacts never enter broker customer queues or escalations',()=>{
+ const {buildManagementExceptions}=require('../lib/flow/engine.ts');
+ const recruiting=lead({stage:' Recruiting ',overdueTaskCount:1});
+ assert.deepEqual(buildFlowQueue([recruiting],[],7),[]);
+ assert.deepEqual(buildManagementExceptions([recruiting],[{id:'pass',kind:'broker.pass',leadId:String(recruiting.id),createdAt:new Date().toISOString()}],[]),[]);
+ const {cadencePolicy}=require('../lib/policy/vesta.ts');
+ assert.equal(cadencePolicy({lane:'buyer',stage:'Recruiting',tags:[]}).key,'operationally-suppressed');
+});
