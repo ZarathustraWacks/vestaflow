@@ -76,10 +76,10 @@ export async function fubRequest<T>(pathOrUrl: string, init: RequestInit = {}, a
 }
 
 type Metadata = { next?: string | null; nextLink?: string | null; total?: number; count?: number };
-type PaginatedPayload<T> = { people?:T[]; users?:T[]; tasks?:T[]; calls?:T[]; textMessages?:T[]; events?:T[]; notes?:T[]; appointments?:T[]; appointmentTypes?:T[]; appointmentOutcomes?:T[]; smartLists?:T[]; smartlists?:T[]; customFields?:T[]; timeframes?:T[]; data?:T[]; _metadata?:Metadata };
+type PaginatedPayload<T> = { people?:T[]; users?:T[]; tasks?:T[]; calls?:T[]; textMessages?:T[]; textmessages?:T[]; events?:T[]; notes?:T[]; appointments?:T[]; appointmentTypes?:T[]; appointmentOutcomes?:T[]; smartLists?:T[]; smartlists?:T[]; customFields?:T[]; timeframes?:T[]; data?:T[]; _metadata?:Metadata };
 
 function extractItems<T>(payload: PaginatedPayload<T>): T[] {
-  return payload.people ?? payload.users ?? payload.tasks ?? payload.calls ?? payload.textMessages ?? payload.events ?? payload.notes ?? payload.appointments ?? payload.appointmentTypes ?? payload.appointmentOutcomes ?? payload.smartLists ?? payload.smartlists ?? payload.customFields ?? payload.timeframes ?? payload.data ?? [];
+  return payload.people ?? payload.users ?? payload.tasks ?? payload.calls ?? payload.textMessages ?? payload.textmessages ?? payload.events ?? payload.notes ?? payload.appointments ?? payload.appointmentTypes ?? payload.appointmentOutcomes ?? payload.smartLists ?? payload.smartlists ?? payload.customFields ?? payload.timeframes ?? payload.data ?? [];
 }
 
 export async function paginate<T>(

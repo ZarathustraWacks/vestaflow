@@ -4,17 +4,17 @@ const DAY=86400000;
 const at=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(value))?Date.parse(value):null;
 const tags=(lead:any):string[]=>(lead.tags||[]).map((tag:any)=>typeof tag==='string'?tag.trim().toLowerCase():String(tag?.name||'').trim().toLowerCase());
 export const isImportantContact=(lead:any)=>tags(lead).includes('important');
-export const isPastClient=(lead:any)=>policyStage(lead.stage)==='closed';
+export const isPastClient=(lead:any)=>policyStage(lead.cadenceStage||lead.stage)==='closed';
 export function contactEstablished(lead:any){
- return Boolean(at(lead.twoWayEngagementAt)||lead.contacted===true||lead.raw?.contacted===true||['spoke with','appointment set','appointment met','showing homes','submitting offers','under contract','closed'].includes(policyStage(lead.stage)));
+ return Boolean(at(lead.twoWayEngagementAt)||at(lead.documentedContactAt)||lead.contactContext?.contactEstablished===true||lead.contacted===true||lead.raw?.contacted===true||['spoke with','appointment set','appointment met','showing homes','submitting offers','under contract','closed'].includes(policyStage(lead.cadenceStage||lead.stage)));
 }
 export function needsBuyerContact(lead:any){
  if(lead.leadLane!=='buyer'||contactEstablished(lead))return false;
- return ['lead','attempted contact','buyer new and needs contact','buyer new needs contact'].includes(policyStage(lead.stage))||lead.cadenceKey==='buyer-new-contact'||tags(lead).some(t=>/^buyer new(?: and)? needs contact$/.test(t));
+ return ['lead','attempted contact','buyer new and needs contact','buyer new needs contact'].includes(policyStage(lead.cadenceStage||lead.stage))||lead.cadenceKey==='buyer-new-contact'||tags(lead).some(t=>/^buyer new(?: and)? needs contact$/.test(t));
 }
-export function nurturePlanNeeded(lead:any){return policyStage(lead.stage)==='nurture'&&(String(lead.cadenceKey||'').includes('unmapped')||lead.cadenceStatus==='unknown');}
+export function nurturePlanNeeded(lead:any){return policyStage(lead.cadenceStage||lead.stage)==='nurture'&&(String(lead.cadenceKey||'').includes('unmapped')||lead.cadenceStatus==='unknown');}
 export function nurtureCadenceConflict(lead:any){
- if(policyStage(lead.stage)!=='nurture')return false;
+ if(policyStage(lead.cadenceStage||lead.stage)!=='nurture')return false;
  const patterns=[/longterm nurture once[\s/]week/,/longterm nurture twice[\s/]month/,/longterm nurture monthly/,/longterm nurture every other month/,/longterm nurture every 6 months/];
  return patterns.filter(pattern=>tags(lead).some(t=>pattern.test(t))).length>1;
 }
@@ -34,7 +34,7 @@ export function flowRelationshipSignals(lead:any,now=Date.now()){
 export function completionStillHeld(lead:any,event:any,now=Date.now()){
  const completed=at(event.createdAt);if(completed===null)return false;
  const raise=at(lead.handRaiseAt);if(raise!==null&&raise>completed&&raise<=now)return false;
- const policy=cadencePolicy({lane:lead.leadLane||'buyer',stage:lead.stage||'',tags:lead.tags||[],timeframeStatus:lead.timeframeStatus});
+ const policy=cadencePolicy({lane:lead.leadLane||'buyer',stage:lead.cadenceStage||lead.stage||'',tags:lead.tags||[],timeframeStatus:lead.timeframeStatus});
  // A completion note is not a permanent opt-out. Reopen at the next approved
  // interval. Unknown Nurture remains a planning reminder after a short review hold.
  const days=policy.days??1;

@@ -15,6 +15,7 @@ import { listingProcess } from '@/lib/integrations/listing';
 import { decisionSnapshot, POLICY_VERSION } from '@/lib/audit/snapshot';
 import {latestHandRaiseAt} from '@/lib/policy/hand-raise';
 import {newestCommunicationDate} from '@/lib/policy/communication';
+import {applyFlowEvidence,enrichFlowContext} from '@/lib/flow/evidence';
 import {applyBrokerCadenceNote} from '@/lib/policy/broker-note';
 import {applyRoutingContext,isRoutingManagerUser} from '@/lib/routing-managers';
 import {fetchOperationalSnapshot,operationalSnapshotEnabled,snapshotRevalidateSeconds,type OperationalSnapshot} from '@/lib/render/operational-snapshot';
@@ -187,28 +188,34 @@ export async function refreshOperationalLead(id:string|number,users:NormalizedUs
  const personId=encodeURIComponent(String(id)),userMap=new Map(users.map(user=>[user.id,user]));
  // Re-read only the selected contact and its open tasks after a broker action.
  // This avoids waiting for the next shared Render snapshot cycle.
- const [response,taskPage,notes]=await Promise.all([
+ const [response,taskPage,collections]=await Promise.all([
   fubRequest<any>(`/people/${personId}`),
-  paginate<any>(`/tasks?personId=${personId}&isCompleted=false`),
-  paginate<any>(`/notes?personId=${personId}`),
+  paginate<any>(`/tasks?personId=${personId}&isCompleted=false`,3),
+  cachedFlowEvidence(personId),
  ]);
  const freshTasks=taskPage.items.map(item=>normalizeTask(item,userMap));
- const base=normalizePersonBase(response.data,userMap),withNote=applyBrokerCadenceNote(base,notes.items||[]);
- return applyRoutingContext(enrichLead(withNote,freshTasks));
+ const base=normalizePersonBase(response.data,userMap),withNote=applyBrokerCadenceNote(base,collections.notes.items||[]);
+ const evidence=applyFlowEvidence(withNote,{notes:collections.notes.items,calls:collections.calls.items,textMessages:collections.textMessages.items});
+ return applyRoutingContext(enrichFlowContext({...enrichLead(evidence,freshTasks),flowCollectionAvailability:{notes:collections.notes.ok,calls:collections.calls.ok,textMessages:collections.textMessages.ok}},freshTasks));
 }
 // Detail collections are independently fallible. `ok:false` distinguishes an
 // unavailable connector from a genuine successful response containing no rows.
-async function safeCollection(path:string){try{const r=await paginate<any>(path);return {ok:true,items:r.items,metadata:r.metadata,pages:r.pages};}catch(error){return {ok:false,items:[],error:error instanceof Error?error.message:'Unavailable'};}}
-export async function getLeadIntelligence(id:string){
- const spine=await getFlowSpine();const lead=spine.people.items.find((x:any)=>String(x.id)===String(id));if(!lead)throw new Error('Lead not found');
+async function safeCollection(path:string){try{const r=await paginate<any>(path,3);return {ok:true,items:r.items,metadata:r.metadata,pages:r.pages};}catch(error){return {ok:false,items:[],error:error instanceof Error?error.message:'Unavailable'};}}
+const cachedFlowEvidence=unstable_cache(async(personId:string)=>{
+ const [notes,calls,textMessages]=await Promise.all([safeCollection(`/notes?personId=${personId}`),safeCollection(`/calls?personId=${personId}`),safeCollection(`/textMessages?personId=${personId}`)]);
+ return {notes,calls,textMessages};
+},['flow-source-evidence-v1'],{revalidate:20});
+export async function getLeadIntelligence(id:string,scope?:{person:any;users:NormalizedUser[]}){
+ const scopedLead=scope?enrichLead(normalizePersonBase(scope.person,new Map(scope.users.map(user=>[user.id,user]))),[]):null;
+ const spine:any=scope?{mode:'live',people:{items:[scopedLead]},users:{items:scope.users},tasks:{items:[]}}:await getFlowSpine();const lead=spine.people.items.find((x:any)=>String(x.id)===String(id));if(!lead)throw new Error('Lead not found');
  const leadTasks=spine.tasks.items.filter((x:any)=>String(x.personId)===String(id));
  if(spine.mode==='demo'){const collections={calls:[{id:1,created:new Date(Date.now()-2*86400000).toISOString(),type:'Outbound call',outcome:'Voicemail'}],textMessages:[{id:2,created:new Date(Date.now()-86400000).toISOString(),type:'Text',message:'Following up on your home search.'}],events:[{id:3,created:new Date().toISOString(),type:'Viewed property',description:'Viewed 3 West Loop listings'}],notes:[],appointments:[]};return {ok:true,mode:'demo',lead,tasks:leadTasks,collections,timeline:buildTimeline(lead,leadTasks,collections),appointmentAudit:auditAppointments(collections.appointments),listingProcess:listingProcess(lead.raw),decisionSnapshot:decisionSnapshot(lead)};}
  const personId=encodeURIComponent(id);const [person,allTasks,calls,textMessages,events,notes,appointments]=await Promise.all([fubRequest<any>(`/people/${personId}`),safeCollection(`/tasks?personId=${personId}`),safeCollection(`/calls?personId=${personId}`),safeCollection(`/textMessages?personId=${personId}`),safeCollection(`/events?personId=${personId}`),safeCollection(`/notes?personId=${personId}`),safeCollection(`/appointments?personId=${personId}`)]);
  const userMap=new Map<number,NormalizedUser>(spine.users.items.map((x:any)=>[x.id,x]));const detailTasks=allTasks.ok?allTasks.items.map((x:any)=>normalizeTask(x,userMap)):leadTasks;
  const normalizedPerson=normalizePersonBase(person.data,userMap);
  const handRaiseAt=latestHandRaiseAt(newestCommunicationDate(normalizedPerson.handRaiseAt,lead.handRaiseAt),events.items||[]);
- const noteAware=applyBrokerCadenceNote({...normalizedPerson,handRaiseAt},notes.items||[]);
- const freshLead=applyRoutingContext(enrichLead(noteAware,detailTasks,appointments.items.map(normalizeAppointment)));
+ const noteAware=applyFlowEvidence(applyBrokerCadenceNote({...normalizedPerson,handRaiseAt},notes.items||[]),{notes:notes.items,calls:calls.items,textMessages:textMessages.items});
+ const freshLead=applyRoutingContext(enrichFlowContext(enrichLead(noteAware,detailTasks,appointments.items.map(normalizeAppointment)),detailTasks,appointments.items.map(normalizeAppointment)));
  const enriched={...freshLead,learningScore:lead.learningScore};const collections={calls:calls.items,textMessages:textMessages.items,events:events.items,notes:notes.items,appointments:appointments.items};return {ok:true,mode:'live',lead:enriched,tasks:detailTasks,collections,timeline:buildTimeline(enriched,detailTasks,collections),rawPerson:person.data,availability:{tasks:allTasks,calls,textMessages,events,notes,appointments},appointmentAudit:auditAppointments(appointments.items),listingProcess:listingProcess(person.data),decisionSnapshot:decisionSnapshot(enriched)};
 }
 export async function debugSample(){if(shouldUseDemo())return {mode:'demo',note:'Add FUB_API_KEY and set FUB_DEMO_MODE=false for a live sample.'};const [identityResult,peopleResult,usersResult]=await Promise.all([fubRequest<unknown>('/identity'),fubRequest<Record<string,unknown>>('/people?limit=2&fields=allFields'),fubRequest<Record<string,unknown>>('/users?limit=10')]);return {mode:'live',identity:identityResult.data,peopleSample:peopleResult.data,usersSample:usersResult.data,safeHeaders:{rateLimit:peopleResult.headers['x-ratelimit-limit']??null,rateRemaining:peopleResult.headers['x-ratelimit-remaining']??null,rateWindow:peopleResult.headers['x-ratelimit-window']??null}};}

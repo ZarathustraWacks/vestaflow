@@ -11,10 +11,11 @@ export interface GovernanceSignal { key:string; label:string; status:'pass'|'war
 export interface LeadDecision { type:string; label:string; urgency:'Immediate'|'Today'|'This week'|'Monitor'; rationale:string; consequence:string; matchedRule:string; evidenceQuality:'High'|'Medium'|'Low'; dataCompleteness:number; }
 export interface OperationalClock {key:'route-acceptance'|'initial-acknowledgement'|'first-contact-attempt'|'meaningful-contact'|'appointment-confirmation'|'ongoing-cadence';label:string;status:'met'|'pending'|'breached'|'unknown'|'not-applicable';dueAt:string|null;clearedAt:string|null;clearingAction:string;policyStatus:'approved'|'proposed'|'ambiguous';}
 export interface NormalizedLead {
+ cadenceStage?:string;crmStage?:string;contactContext?:any;documentedContactAt?:string|null;integrationCommunicationAt?:string|null;contextConflict?:boolean;
   id:number|string; name:string; stage:string; source:string; businessSegment:'buyer-seller'|'rental'|'needs-classification'; businessSegmentReason:string; businessSegmentEvidence?:string[];
   leadLane:LeadLane; timeframeId:number|null; timeframeStatus:string|null;
   assignedUserId:number|null; assignedUserName:string; assignedUserRole:string|null;
-  createdAt:string|null; updatedAt:string|null; lastActivityAt:string|null; lastCommunicationAt:string|null; lastCommunicationSource?:'fub-last-communication'|'fub-contacted'|'fub-note'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|'two-way-call'|'two-way-email'|'two-way-text'|null; brokerOutreachAt?:string|null; customerResponseAt?:string|null; twoWayEngagementAt?:string|null; nextTaskAt:string|null;
+  createdAt:string|null; updatedAt:string|null; lastActivityAt:string|null; lastCommunicationAt:string|null; lastCommunicationSource?:'fub-last-communication'|'fub-contacted'|'fub-note'|'integration-outcome'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|'two-way-call'|'two-way-email'|'two-way-text'|null; brokerOutreachAt?:string|null; customerResponseAt?:string|null; twoWayEngagementAt?:string|null; nextTaskAt:string|null;
   nextAppointmentAt?:string|null; nextActionAt?:string|null; nextActionSource?:'task'|'appointment'|null; taskRepairRecommended?:boolean;
   routingManagerOwner?:boolean; routingCustody?:RoutingCustody|null; routingCustodyReason?:string|null;
   emails:string[]; phones:string[]; tags:string[]; price:number|null; collaborators:string[];

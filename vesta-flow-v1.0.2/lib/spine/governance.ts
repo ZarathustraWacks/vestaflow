@@ -39,7 +39,7 @@ export function enrichLead(base:Omit<NormalizedLead,'ageBand'|'engagementBand'|'
  const nextActionAt=useAppointment?nextAppointmentAt:nextTaskAt,nextActionSource=nextActionAt?(useAppointment?'appointment':'task'):null,taskRepairRecommended=nextTaskAt===null&&nextAppointmentAt!==null;
  const ageBand=created<=7?'Fresh':created<=30?'Developing':created<=90?'Aged':created<=365?'Old':'Legacy';
  const engagementBand=activity===99999?'Unknown':activity<=7?'Active now':activity<=30?'Recently active':activity<=90?'Cooling':'Dormant';
- const policy=cadencePolicy({lane:base.leadLane,stage:base.stage,tags:base.tags,timeframeStatus:base.timeframeStatus});
+ const policy=cadencePolicy({lane:base.leadLane,stage:base.cadenceStage||base.stage,tags:base.tags,timeframeStatus:base.timeframeStatus});
  const brokerActionAt=resolveBrokerActionAt(base);
  const cadence=cadenceState(policy,base.lastCommunicationAt,now),operationalSla=isOperationalLead(base)?responseSla(base.handRaiseAt,brokerActionAt,now):'not-applicable';
  // Current-owner and aggregate communication fields cannot prove broker liability.

@@ -1,4 +1,4 @@
-import {flowRelationshipSignals,completionStillHeld} from './relationships';
+import {flowRelationshipSignals,completionStillHeld,needsBuyerContact} from './relationships';
 import {isOperationalLead} from '@/lib/operational-eligibility';
 import type { FlowEvent,FlowItem,ManagementException } from './types';
 
@@ -21,7 +21,8 @@ function priorityScore(lead:any,relationship=flowRelationshipSignals(lead)){
  // appointment, or verified broker effort can make a lead worth working now.
  // These are additive boosts only; customer non-response never lowers a
  // broker score and system/routing gaps never become broker failures.
- const activityAt=lead.lastActivityAt?Date.parse(lead.lastActivityAt):NaN;
+ const intentAt=lead.handRaiseAt||lead.customerResponseAt;
+ const activityAt=intentAt?Date.parse(intentAt):NaN;
  const communicationAt=lead.lastCommunicationAt?Date.parse(lead.lastCommunicationAt):NaN;
  const activeMomentum=Number.isFinite(activityAt)&&(!Number.isFinite(communicationAt)||activityAt>communicationAt)&&Date.now()-activityAt<=7*86400000?35:0;
  const appointmentAt=lead.nextAppointmentAt?Date.parse(lead.nextAppointmentAt):NaN;
@@ -33,7 +34,7 @@ function priorityScore(lead:any,relationship=flowRelationshipSignals(lead)){
 function actionable(lead:any,now=Date.now(),relationship=flowRelationshipSignals(lead,now)){
  if(!relationship.queueEligible)return false;
  if(relationship.pastClient&&(relationship.dueTask||relationship.recentRequest||relationship.appointmentDue))return true;
- if(relationship.needsContactNow||relationship.needsCadencePlan||relationship.cadenceConflict||relationship.importantPlan)return true;
+ if(lead.contextConflict||relationship.needsContactNow||relationship.needsCadencePlan||relationship.cadenceConflict||relationship.importantPlan)return true;
  if(lead.decision?.urgency&&lead.decision.urgency!=='Monitor')return true;
  if(lead.overdueTaskCount>0||lead.taskRepairRecommended||['due','overdue'].includes(lead.cadenceStatus))return true;
  const next=lead.nextActionAt?Date.parse(lead.nextActionAt):0;
@@ -51,6 +52,7 @@ function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
  const pass=unresolvedPass(events);if(pass)return true;
  const nurture=events.find(event=>event.kind==='management.nurture');if(nurture&&(!nurture.returnAt||new Date(nurture.returnAt).getTime()>now))return true;
  const latest=events[0];if(!latest)return false;
+ if(latest.kind==='broker.complete'&&needsBuyerContact(lead)&&['Follow-up task created','Follow-up scheduled','Appointment confirmed'].includes(latest.outcome||''))return false;
  const relationship=flowRelationshipSignals(lead,now);
  if(relationship.pastClient&&relationship.dueTask&&latest.kind==='broker.complete')return false;
  // A broker's completed action may write a note back to FUB. That writeback
@@ -72,8 +74,8 @@ export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|nu
  const history=leadEvents(events,String(lead.id)),owner=latestOwnership(lead,history),relationship=flowRelationshipSignals(lead);
   if(owner.id!==brokerId||suppressed(lead,history)||!actionable(lead,Date.now(),relationship))continue;
   const score=priorityScore(lead,relationship),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
-  const recommendation=relationship.needsContactNow?'Contact buyer - contact not yet established':relationship.cadenceConflict?'Confirm one nurture cadence':relationship.needsCadencePlan?'Plan nurture follow-up':relationship.importantPlan?'Plan an Important contact follow-up':null;
-  items.push({relationship,id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:recommendation||lead.decision?.label||lead.recommendedAction,rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
+  const recommendation=lead.contextConflict?lead.decision?.label||'Review the recorded disposition':relationship.needsContactNow?'Contact buyer - contact not yet established':relationship.cadenceConflict?'Confirm one nurture cadence':relationship.needsCadencePlan?'Plan nurture follow-up':relationship.importantPlan?'Plan an Important contact follow-up':null;
+  items.push({relationship,id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:lead.contextConflict?'Today':relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:recommendation||lead.decision?.label||lead.recommendedAction,rationale:lead.contextConflict?lead.decision.rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
  }
  return items.sort((a,b)=>b.priorityScore-a.priorityScore||a.lead.governanceScore-b.lead.governanceScore).map((item,index)=>({...item,position:index+1}));
 }

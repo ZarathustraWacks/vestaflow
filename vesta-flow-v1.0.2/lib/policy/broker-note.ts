@@ -6,6 +6,7 @@ const noteAuthorName=(note:any)=>String(note?.userName??note?.createdBy?.name??n
 export function applyBrokerCadenceNote(lead:any,notes:any[]){
  const brokerId=Number(lead.assignedUserId),brokerName=String(lead.assignedUserName||'').trim().toLowerCase();
  const candidates=notes.map(note=>({note,at:noteDate(note),authorId:noteAuthorId(note),authorName:noteAuthorName(note)})).filter(item=>item.at).filter(item=>{
+  if(item.note?.isExternal===true||(/^(zapier|shilo|sisu)(?:\b|$)/i.test(String(item.note?.systemName||''))))return false;
   const idKnown=Number.isFinite(item.authorId)&&item.authorId>0,nameKnown=Boolean(item.authorName);
   return idKnown?item.authorId===brokerId:Boolean(nameKnown&&brokerName&&item.authorName===brokerName);
  }).sort((a,b)=>Date.parse(b.at!)-Date.parse(a.at!));

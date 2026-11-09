@@ -1,5 +1,6 @@
+import {enrichFlowContext} from '@/lib/flow/evidence';
 import {flowRelationshipSignals} from '@/lib/flow/relationships';
-import { NextRequest,NextResponse } from 'next/server';
+import { after,NextRequest,NextResponse } from 'next/server';
 import { getFlowSpine,refreshOperationalLead } from '@/lib/fub/service';
 import { buildFlowQueue } from '@/lib/flow/engine';
 import { discoverBrokers,initialFlowBrokerId } from '@/lib/flow/brokers';
@@ -24,7 +25,7 @@ export async function GET(request:NextRequest){
   const brokerId=manager?(requestedId!==null&&Number.isFinite(requestedId)?requestedId:initialFlowBrokerId(brokers)):ownId;
   const selectedBrokerId=Number.isFinite(brokerId as number)?brokerId:null;
   const refreshId=request.nextUrl.searchParams.get('refreshLeadId');
-  let people:any[]=spine.people.items;
+  let people:any[]=spine.people.items.map((lead:any)=>enrichFlowContext(lead,spine.tasks.items));
   if(refreshId&&spine.mode==='live'){
    try{
     const refreshed=await refreshOperationalLead(refreshId,spine.users.items,spine.tasks.items);
@@ -38,10 +39,12 @@ export async function GET(request:NextRequest){
   if(spine.mode==='live'&&queue.length){
    // The queue must render before optional note enrichment. A slow FUB notes
    // call must never consume the whole broker request budget.
-   const bounded=(item:any)=>Promise.race([
-    refreshOperationalLead(item.leadId,spine.users.items,spine.tasks.items).catch(()=>null),
+   const pending:Promise<any>[]=[];
+   const bounded=(item:any)=>{const refresh=refreshOperationalLead(item.leadId,spine.users.items,spine.tasks.items).catch(()=>null);pending.push(refresh);return Promise.race([
+    refresh,
     new Promise<null>(resolve=>setTimeout(()=>resolve(null),2500)),
-   ]);
+   ]);};
+   after(async()=>{await Promise.allSettled(pending)});
    const refreshed=(await Promise.all(queue.slice(0,3).map(bounded))).filter(Boolean) as any[];
    if(refreshed.length){const byId=new Map(refreshed.map(item=>[String(item.id),item]));people=people.map((lead:any)=>byId.get(String(lead.id))||lead);queue=buildFlowQueue(people,events,selectedBrokerId);}
   }
@@ -54,7 +57,7 @@ export async function GET(request:NextRequest){
     .sort((a:any,b:any)=>(Date.parse(a.dueAt||'')||Infinity)-(Date.parse(b.dueAt||'')||Infinity));
   const taskSummary={total:tasks.length,overdue:tasks.filter((task:any)=>task.dueAt&&Date.parse(task.dueAt)<Date.now()).length,dueToday:tasks.filter((task:any)=>{if(!task.dueAt)return false;const d=new Date(task.dueAt),n=new Date();return d.toDateString()===n.toDateString()}).length};
   const unresolvedOwners=people.filter((lead:any)=>lead.assignedUserId!==null&&!spine.users.items.some((user:any)=>user.id===lead.assignedUserId)).length;
-  const customers=people.filter(isOperationalLead).map((lead:any)=>({relationship:flowRelationshipSignals(lead),id:lead.id,name:lead.name,stage:lead.stage,source:lead.source,leadLane:lead.leadLane,assignedUserId:lead.assignedUserId,assignedUserName:lead.assignedUserName,phones:lead.phones||[],emails:lead.emails||[],tags:lead.tags||[],cadenceLabel:lead.cadenceLabel,cadenceStatus:lead.cadenceStatus,cadenceDaysLate:lead.cadenceDaysLate,lastActivityAt:lead.lastActivityAt,lastCommunicationAt:lead.lastCommunicationAt,nextActionAt:lead.nextActionAt,nextActionSource:lead.nextActionSource,nextAppointmentAt:lead.nextAppointmentAt,governanceScore:lead.governanceScore,riskLevel:lead.riskLevel,decision:lead.decision,evidenceSummary:lead.evidenceSummary||null}));
+  const customers=people.filter(isOperationalLead).map((lead:any)=>({cadenceStage:lead.cadenceStage,contactContext:lead.contactContext,relationship:flowRelationshipSignals(lead),id:lead.id,name:lead.name,stage:lead.stage,source:lead.source,leadLane:lead.leadLane,assignedUserId:lead.assignedUserId,assignedUserName:lead.assignedUserName,phones:lead.phones||[],emails:lead.emails||[],tags:lead.tags||[],cadenceLabel:lead.cadenceLabel,cadenceStatus:lead.cadenceStatus,cadenceDaysLate:lead.cadenceDaysLate,lastActivityAt:lead.lastActivityAt,lastCommunicationAt:lead.lastCommunicationAt,nextActionAt:lead.nextActionAt,nextActionSource:lead.nextActionSource,nextAppointmentAt:lead.nextAppointmentAt,governanceScore:lead.governanceScore,riskLevel:lead.riskLevel,decision:lead.decision,evidenceSummary:lead.evidenceSummary||null}));
   return NextResponse.json({ok:true,mode:spine.mode,dataState:spine.dataState,bulkScheduling:{enabled:spine.mode==='live'&&storage.available&&completionWritebackStatus(spine.mode).enabled},brokerId,brokers,queue,total:queue.length,tasks,taskSummary,customers,storage,writeback:completionWritebackStatus(spine.mode),policy:spine.policy,diagnostics:{people:people.length,users:spine.users.items.length,brokers:brokers.length,ownersRecoveredFromLeads:brokers.filter(broker=>broker.source==='lead-owner').length,unresolvedOwners}});
  }catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:'Unable to build Vesta Flow queue.'},{status:500})}
 }
