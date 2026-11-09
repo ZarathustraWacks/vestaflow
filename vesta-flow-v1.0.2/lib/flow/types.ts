@@ -34,6 +34,7 @@ export interface FlowStorageStatus {
 }
 
 export interface FlowItem {
+ relationship?:ReturnType<typeof import('./relationships').flowRelationshipSignals>;
  id:string;
  leadId:string;
  lead:any;
