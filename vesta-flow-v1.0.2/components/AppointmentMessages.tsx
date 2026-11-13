@@ -35,7 +35,7 @@ export default function AppointmentMessages({contacts=[],scope='test',loadContac
  const fubUrl=/^[1-9]\d*$/.test(context.leadId)?`https://vestapreferred.followupboss.com/2/people/view/${context.leadId}`:null;
  const path=paths.find(item=>item.id===context.pathId),outcome=outcomes.find(item=>item.id===context.outcomeId);
  return <div className={styles.workspace}>
-  <section className={styles.hero}><div><h2>Your next message</h2><span>No recorded conversation first, then cadence urgency. Review the suggestion and send in FUB.</span></div><b>{contacts.length} ready for review</b></section>
+  <section className={styles.hero}><div><h2>Your next message</h2><span>Newest leads first. Review the suggestion and send in FUB.</span></div><b>{contacts.length} ready for review</b></section>
   <div className={styles.selectors}><label>Find a lead<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name, stage or source"/></label><label>Priority order<select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Choose a lead</option>{filtered.slice(0,200).map((item,index)=><option key={item.id} value={String(item.id)}>{index+1}. {item.name} · {item.messageReason||item.stage}</option>)}{lead&&!filtered.slice(0,200).some(item=>String(item.id)===selected)&&<option value={selected}>{lead.name}</option>}</select></label></div>
   {!contacts.length&&<section className={styles.panel}><h3>No eligible messaging actions are due</h3><p>This list follows the selected broker's active Flow queue. Zenlist duplicates, excluded records, held actions and follow-ups not yet due are left out.</p></section>}
   {error&&<p className={styles.error} role="alert">{error}</p>}{notice&&<p className={styles.notice} role="status">{notice}</p>}

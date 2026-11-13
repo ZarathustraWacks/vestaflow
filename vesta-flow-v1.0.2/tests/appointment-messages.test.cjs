@@ -123,7 +123,7 @@ test('email fallback respects do-not-text without granting email permission',()=
 });
 const {messagingQueue,hasRecordedConversation}=require('../lib/appointment/priority.ts');
 const queued=(id,extra={},item={})=>({leadId:String(id),effectiveOwnerId:30,priorityScore:100,priorityLabel:'Today',position:id,relationship:{},lead:{id,name:'Synthetic '+id,stage:'Lead',source:'Website',leadLane:'buyer',cadenceStatus:'overdue',...extra},...item});
-test('message priority puts no recorded conversation ahead of contacted leads, then cadence urgency',()=>{
+test('equal or missing creation times prioritize no recorded conversation, then cadence urgency',()=>{
  const items=[queued(1,{documentedContactAt:now.toISOString(),cadenceDaysLate:30},{priorityLabel:'Immediate'}),queued(2,{cadenceStatus:'due'}),queued(3,{cadenceDaysLate:2}),queued(4,{cadenceDaysLate:6})];
  assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['4','3','2','1']);
  assert.equal(hasRecordedConversation({brokerOutreachAt:now.toISOString(),lastCommunicationAt:now.toISOString(),contactContext:{kind:'attempted'}}),false);
@@ -134,4 +134,9 @@ test('message list cannot resurrect suppressed roster leads, future followups, d
  assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['1']);assert.deepEqual(messagingQueue(items,null),[]);
  const routed=queued(10,{assignedUserId:31},{effectiveOwnerId:30});assert.equal(messagingQueue([routed],30).length,1);
  assert.equal(messagingQueue([queued(11,{cadenceStatus:'current'},{relationship:{recentRequest:true}})],30).length,1);
+});
+
+test('newest original creation sorts first regardless of activity updates, with invalid dates last',()=>{
+ const items=[queued(1,{createdAt:'2026-11-10T12:00:00Z',updatedAt:now.toISOString()}),queued(2,{createdAt:'2026-11-12T12:00:00Z',documentedContactAt:now.toISOString()}),queued(3,{createdAt:'2026-11-11T12:00:00Z'}),queued(4,{createdAt:'invalid'}),queued(5,{createdAt:'2099-01-01T00:00:00Z'})];
+ assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['2','3','1','4','5']);
 });

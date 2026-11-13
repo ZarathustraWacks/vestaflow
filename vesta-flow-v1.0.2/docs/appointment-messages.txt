@@ -3,8 +3,10 @@ Flow appointment messages — broker workflow
 The view consumes the broker's authorized, unsuppressed Flow queue, not the
 customer roster. It excludes Zenlist-source duplicates, recruiting and other
 non-customer records, conflicting identity/intent, and follow-ups not yet due.
-Messaging priority puts no recorded customer conversation first, then overdue /
-due cadence, urgency, lateness and existing Flow priority. An unanswered attempt
+Messaging priority uses original lead creation time, newest first. Matching or
+missing creation dates use no recorded conversation, overdue / due cadence,
+urgency, lateness and existing Flow priority as tie-breakers. Invalid or future
+creation timestamps sort behind valid dates; updated/activity times do not count. An unanswered attempt
 is not a recorded conversation. This changes only the messaging view's order.
 
 On selection, one current contact detail request loads FUB evidence. Missing
