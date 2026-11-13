@@ -1,0 +1,81 @@
+APPOINTMENT MESSAGE WORKSPACE — November12,2026
+
+Scope: additive editable Flow tab and the identical test workspace in scaffolding
+and proto. Original navigation/layout, queues, SOP, original-incoming first-contact
+clock, broker credit, Dailygoal, critical-action automation and FUBwriteback remain
+unchanged. Zenlist services are unrelated and unchanged.
+
+Research input: lib/operations/nurture.ts aggregate nurture report (Nov5),11483
+contacts,17overlapping categories. These are path-taxonomy evidence, not proof of
+current intent or a predictive conversion model. Paths: new/noresponse, explicit
+condition, futuretiming, relocation, financing, price, inventory, salecontingency,
+lifeevent/lease, decisionmakers, due diligence, investorstrategy, uncertainty,
+appointmentpending, seller, pastclient/referral, preferences/exclusions and hygiene.
+
+Outcome graph: choose current evidenced outcome -> clarifyneed/permission ->
+consultation -> preferredwindow -> broker/calendarverification -> appointmentset.
+Explicitconditions stay wait/permission until customerchange is confirmed. DNC,
+recruiting, Zenlist-source duplicates and identity/conflict outcomes stop/hold;
+there is no sales push on those branches. Supplying a time is not booking.
+
+Flow uses existing broker customer view; detailed contact read uses the existing
+authorized /api/leads/{id} route and fails closed on denied/failed access. Fresh
+source DNC cannot be unchecked. Missing identity/channelpermission defaults to
+hold. Reviewchecklists are broker declarations in a simulation, not independent
+CRMverification. No bulkmessages or independent source harvest introduced.
+
+Message assembly: approved phrase components and path-specific next questions,
+rotated across substantive components, checked against all stored proposal/edit
+text after Unicode/spacing/punctuation/case normalization. No nonce appended.
+384possible messages per fixed name/path/questionfamily; exhausted choices HOLD
+for new wording. No infinite-variation promise or trainedLLM claim. History is
+per browser and workspace/broker scope, not globalcross-device deliveryhistory.
+Corrupt/unavailable storage holds generation; failures never silently reset it.
+History has20000recordcaps; no pruning that could erase duplicateprotection.
+
+Broker control: generate -> edit any wording -> approve this exact revision ->
+simulate only. Edits invalidateapproval; dirtyUI disablesdeliverysimulation.
+Changing contact,outcome,path,condition,channel,permission,snapshot or manager
+reason also invalidatesapproval. A newer draft supersedes prior approval for that
+contact. Approved text is captured exactly in the testdelivery/outcomeexport.
+
+Outcome connection: each simulated customerreply or appointment is linked by
+specific decisionID, time, leadID and synthetic appointmentreference. Failed sends,
+drafts and generic messageactivity never count as appointments, broker actions,
+contactobligation resolution, CRMcommunication, dailygoal or productiontraining.
+Export uses decision/outcome fields compatible with the existing scaffolding
+reply-test/outcome adapter. It is simulation:true,trainingEligible:false and
+productionWrites:false. It is not posted into the unsafe latest-prior-decision
+production attribution path or the prototype's global mocklearning state.
+
+Access: Flow sidebar Appointment messages. Scaffolding/proto sidebar Appointment
+messages or ?workspace=appointment-messages. Existing scaffolding Auto-replytest
+links to this workspace; its original tests/parser/sender simulation remain intact.
+Scaffolding/proto use clearly named SampleBuyer/SampleSeller, not FUB identities.
+No real messenger was found: the existing replier is browser-only, and proto
+assistantapproval/outreach is simulated. dispatch() throws unconditionally.
+
+Before live delivery: implement real channel/provider transport, action-time FUB
+identity/ownership/consentDNC+manageroverride checks, channelrestrictions and fresh
+context; add centrally durable text reservations and idempotent delivery receipts
+with exactedited-body approval binding, senderfailure/filteredmessage handling,
+per-message inboundreply correlation and independent appointmentreadback. Require
+separate activation/review. Never turn JSONsimulationresults into live outcomes.
+
+No new Render/Vercel services, costs, APIkeys, schedules, automatic sends,
+appointments or CRMwrites are created by this UIfeature. Deployment of a review
+workspace is not activation of a sender. Build/tests exercise safetystops, finite
+nonrepeat supply, editableapprovalrevision, stalecontext, failedsend attribution,
+independent appointment evidence and no productiontransport calls.
+
+User steering: two primarybuttons requested. Hold and save for training model
+saves the original+exactedited draft, revision, snapshot, context and reason as
+a pending review candidate in the browser/export. It sends nothing, invalidates
+approval and never grants trainingeligibility. Not a central training database.
+Done and sync to FUB is shown disabled until a real per-draft sender is verified;
+no logging-only SMS endpoint is called. User is considering native automations.
+OfficialFUBdocs: textMessagesPOST logs only. actionPlansPeoplePOST accepts only
+personId/actionPlanId, not a messagebody. Automation-triggeredActionPlans do NOT
+send initialSMS (LeadFlowinitialtextonly). ActionPlans can send emails; rewriting
+sharedtemplates affects all plans. Do not generatefakeincomingevents or mutate
+sharedtemplates to force an SMS. Nativeautomation route remains under review.
