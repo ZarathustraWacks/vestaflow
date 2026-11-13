@@ -1,5 +1,6 @@
+import {contactHistoryState} from '../policy/contact-history';
 import {paths,outcomes} from './catalog';
-export type Context={leadId:string;name:string;stage:string;source:string;lane:string;consent:boolean;dnc:boolean;sourceDnc:boolean;pathId:string;outcomeId:string;condition:string;conditionCleared:boolean;managerReason:string;identityVerified:boolean;channel:'sms'|'email';snapshotId:string};
+export type Context={leadId:string;name:string;stage:string;source:string;lane:string;consent:boolean;dnc:boolean;sourceDnc:boolean;pathId:string;outcomeId:string;condition:string;conditionCleared:boolean;managerReason:string;identityVerified:boolean;channel:'sms'|'email';snapshotId:string;cadencePlanningRequired?:boolean};
 export type Draft={id:string;leadId:string;snapshotId:string;body:string;revision:number;contextKey:string;approvedKey:string|null;pathId:string;outcomeId:string;at:string;mode:'review-only';status:'draft'|'approved'|'held'|'simulated-delivery'|'simulated-failure'};
 export type History={id:string;leadId:string;body:string;at:string;decisionId:string;kind:'proposed'|'edited'|'simulated-delivery'|'simulated-failure'};
 export type Result={id:string;decisionId:string;kind:'customer_response'|'appointment_set';at:string;appointmentId?:string;verification:'simulated'};
@@ -9,8 +10,9 @@ export const emptyWorkspace=():Workspace=>({version:1,history:[],drafts:[],resul
 export const contextFor=(lead:any):Context=>{
  const recorded=lead?.contactContext||{},raw=lead?.raw||{},stage=String(lead?.cadenceStage||lead?.stage||''),future=recorded.kind==='long-term',condition=recorded.condition||'';
  const channel=(!lead?.phones?.length&&lead?.emails?.length)||raw.doNotText?'email':'sms';
- const outcomeId=condition||future?'not-ready':recorded.kind==='review'?'wrong':recorded.kind==='connected'?'reply':'no-response';
- return {leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId:lead?.contextConflict?'hygiene':condition?'conditional':future||/^nurture$/i.test(stage)?'timing':/^closed$/i.test(stage)?'relationship':lead?.leadLane==='seller'?'seller':'new',outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
+ const appointment=/^appointment (set|met)$/i.test(stage),requestAt=Math.max(0,...[lead?.handRaiseAt,lead?.customerResponseAt].map(value=>Date.parse(value||'')).filter(Number.isFinite)),outreachAt=Date.parse(lead?.brokerOutreachAt||''),freshRequest=Number.isFinite(requestAt)&&requestAt<=Date.now()&&Date.now()-requestAt<=7*86400000&&(!Number.isFinite(outreachAt)||requestAt>outreachAt),planMissing=lead?.cadenceStatus==='unknown'&&/^nurture$/i.test(stage)&&!freshRequest;
+ const outcomeId=appointment?'appointment-set':condition||future?'not-ready':recorded.kind==='review'?'wrong':recorded.kind==='connected'||contactHistoryState(lead)==='prior-conversation'?'reply':'no-response';
+ return {...(planMissing?{cadencePlanningRequired:true}:{}),leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId:lead?.contextConflict?'hygiene':appointment?'appointment':condition?'conditional':future||/^nurture$/i.test(stage)?'timing':/^closed$/i.test(stage)?'relationship':lead?.leadLane==='seller'?'seller':'new',outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
 };
 export const normalize=(text:string)=>text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export const contextKey=(c:Context)=>JSON.stringify(c);
@@ -27,6 +29,7 @@ export function gate(c:Context){
  if(c.dnc||c.sourceDnc||c.outcomeId==='stop')return 'Do not contact: outreach is stopped.';
  if(/^(recruiting|trash|deleted|archived|cold leads)$/i.test(c.stage.trim()))return 'This stage is excluded from customer appointment outreach.';
  if(/zenlist/i.test(c.source))return 'Reconcile the Zenlist-source duplicate to its original FUB record first.';
+ if(c.cadencePlanningRequired)return 'Confirm a nurture follow-up plan in FUB before preparing more outreach.';
  if(['wrong'].includes(c.outcomeId)||['preference','hygiene'].includes(c.pathId))return 'Broker review is required before customer outreach.';
  if(!c.identityVerified)return 'Confirm the selected FUB record is the intended contact.';
  if(!c.consent)return 'Confirm permission for the selected contact channel.';

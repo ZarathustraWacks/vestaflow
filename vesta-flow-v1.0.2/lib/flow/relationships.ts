@@ -1,3 +1,4 @@
+import {contactHistoryState} from '@/lib/policy/contact-history';
 /** Flow-only relationship views. Does not change shared SOP or response clocks. */
 import {cadencePolicy,policyStage} from '@/lib/policy/vesta';
 const DAY=86400000;
@@ -5,11 +6,10 @@ const at=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(va
 const tags=(lead:any):string[]=>(lead.tags||[]).map((tag:any)=>typeof tag==='string'?tag.trim().toLowerCase():String(tag?.name||'').trim().toLowerCase());
 export const isImportantContact=(lead:any)=>tags(lead).includes('important');
 export const isPastClient=(lead:any)=>policyStage(lead.cadenceStage||lead.stage)==='closed';
-export function contactEstablished(lead:any){
- return Boolean(at(lead.twoWayEngagementAt)||at(lead.documentedContactAt)||lead.contactContext?.contactEstablished===true||lead.contacted===true||lead.raw?.contacted===true||['spoke with','appointment set','appointment met','showing homes','submitting offers','under contract','closed'].includes(policyStage(lead.cadenceStage||lead.stage)));
-}
+export function contactEstablished(lead:any){return contactHistoryState(lead)==='prior-conversation';}
+
 export function needsBuyerContact(lead:any){
- if(lead.leadLane!=='buyer'||contactEstablished(lead))return false;
+ if(lead.leadLane!=='buyer'||contactHistoryState(lead)!=='no-conversation')return false;
  return ['lead','attempted contact','buyer new and needs contact','buyer new needs contact'].includes(policyStage(lead.cadenceStage||lead.stage))||lead.cadenceKey==='buyer-new-contact'||tags(lead).some(t=>/^buyer new(?: and)? needs contact$/.test(t));
 }
 export function nurturePlanNeeded(lead:any){return policyStage(lead.cadenceStage||lead.stage)==='nurture'&&(String(lead.cadenceKey||'').includes('unmapped')||lead.cadenceStatus==='unknown');}

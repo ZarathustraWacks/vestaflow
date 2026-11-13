@@ -1,3 +1,4 @@
+import {historicalConversationAt} from '@/lib/policy/contact-history';
 /** Normalize variable FUB payload shapes and preserve classification evidence. */
 import { NormalizedAppointment, NormalizedLead, NormalizedTask, NormalizedUser } from '@/lib/domain/types';
 import { resolveLane } from '@/lib/policy/vesta';
@@ -42,22 +43,24 @@ const latestFieldDate=(...values:unknown[])=>newest(values.map(value=>({source:'
  * can restart cadence too, while remaining separate from broker action credit.
  */
 export function resolveCadenceCommunication(p:any):{at:string|null;source:CommunicationSource;brokerOutreachAt:string|null;customerResponseAt:string|null;customerResponseSource:CustomerResponseSource;twoWayEngagementAt:string|null}{
-  const outreach=newest([
+  const outreachCandidates=[
     {source:'outbound-call',at:latestFieldDate(p.lastOutgoingCall,p.lastOutboundCallAt,p.communication?.lastOutgoingCall,p.communication?.lastOutboundCallAt)},
     {source:'outbound-email',at:latestFieldDate(p.lastEmailSentAt,p.lastOutboundEmailAt,p.lastSentEmail,p.emailLastSentAt,p.communication?.lastEmailSentAt)},
     {source:'outbound-text',at:latestFieldDate(p.lastTextSentAt,p.lastOutboundTextAt,p.lastSentText,p.textLastSentAt,p.lastSmsSentAt,p.communication?.lastTextSentAt)},
     {source:'email',at:explicitlyOutboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
     {source:'text',at:explicitlyOutboundObjectDate(p.lastText??p.communication?.lastText)},
     {source:'outbound-call',at:explicitlyOutboundObjectDate(p.lastCall??p.communication?.lastCall)},
-  ] as {source:Exclude<CommunicationSource,null>;at:string|null}[]);
-  const response=newest([
+  ] as {source:Exclude<CommunicationSource,null>;at:string|null}[];
+  const outreach=newest(outreachCandidates);
+  const responseCandidates=[
     {source:'inbound-call',at:latestFieldDate(p.lastIncomingCall,p.lastInboundCallAt,p.lastReceivedCall,p.callLastReceivedAt,p.communication?.lastIncomingCall,p.communication?.lastInboundCallAt)},
     {source:'inbound-email',at:latestFieldDate(p.lastEmailReceivedAt,p.lastInboundEmailAt,p.lastReceivedEmail,p.emailLastReceivedAt,p.communication?.lastEmailReceivedAt)},
     {source:'inbound-text',at:latestFieldDate(p.lastTextReceivedAt,p.lastInboundTextAt,p.lastReceivedText,p.textLastReceivedAt,p.lastSmsReceivedAt,p.communication?.lastTextReceivedAt)},
     {source:'inbound-call',at:explicitlyInboundObjectDate(p.lastCall??p.communication?.lastCall)},
     {source:'inbound-email',at:explicitlyInboundObjectDate(p.lastEmail??p.communication?.lastEmail)},
     {source:'inbound-text',at:explicitlyInboundObjectDate(p.lastText??p.communication?.lastText)},
-  ] as {source:Exclude<CustomerResponseSource,null>;at:string|null}[]);
+  ] as {source:Exclude<CustomerResponseSource,null>;at:string|null}[];
+  const response=newest(responseCandidates);
   const paired=Boolean(outreach?.at&&response?.at&&Date.parse(response.at)>=Date.parse(outreach.at));
   // Retain a legacy aggregate only when explicit effort is absent and the
   // aggregate is not the known customer-response timestamp. Consumers can
@@ -66,7 +69,7 @@ export function resolveCadenceCommunication(p:any):{at:string|null;source:Commun
   const responseTime=response?.at?Date.parse(response.at):null;
   const legacy=newest([{source:'fub-last-communication' as const,at:aggregate},{source:'fub-contacted' as const,at:objectDate(p.contacted)}].filter(row=>row.at!==null&&(responseTime===null||Date.parse(row.at)!==responseTime)));
   const effective=paired?{source:response!.source.replace('inbound-','two-way-') as CommunicationSource,at:response!.at}:outreach||legacy;
-  return {at:effective?.at||null,source:effective?.source||null,brokerOutreachAt:outreach?.at||null,customerResponseAt:response?.at||null,customerResponseSource:response?.source||null,twoWayEngagementAt:paired?response!.at:null};
+  return {at:effective?.at||null,source:effective?.source||null,brokerOutreachAt:outreach?.at||null,customerResponseAt:response?.at||null,customerResponseSource:response?.source||null,twoWayEngagementAt:historicalConversationAt(p,outreachCandidates.map(x=>x.at),responseCandidates.map(x=>x.at))};
 }
 /**
  * Compatibility wrapper for cadence: outreach alone or a later customer reply.
