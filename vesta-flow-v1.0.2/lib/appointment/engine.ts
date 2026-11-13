@@ -6,7 +6,12 @@ export type Result={id:string;decisionId:string;kind:'customer_response'|'appoin
 export type TrainingCandidate={id:string;decisionId:string;leadId:string;revision:number;snapshotId:string;draftContextKey:string;originalBody:string;editedBody:string;reason:string;context:Context;at:string;reviewStatus:'pending';trainingEligible:false;sent:false};
 export type Workspace={version:1;history:History[];drafts:Draft[];results:Result[];held:TrainingCandidate[]};
 export const emptyWorkspace=():Workspace=>({version:1,history:[],drafts:[],results:[],held:[]});
-export const contextFor=(lead:any):Context=>({leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(lead?.raw?.doNotContact||lead?.raw?.doNotText||lead?.doNotContact),sourceDnc:Boolean(lead?.raw?.doNotContact||lead?.raw?.doNotText||lead?.doNotContact),pathId:lead?.contactContext?.condition?'conditional':lead?.leadLane==='seller'?'seller':/^closed$/i.test(lead?.stage||'')?'relationship':'new',outcomeId:'no-response',condition:lead?.contactContext?.condition||'',conditionCleared:false,managerReason:'',identityVerified:false,channel:'sms',snapshotId:String(lead?.decisionSnapshotId||'unverified')});
+export const contextFor=(lead:any):Context=>{
+ const recorded=lead?.contactContext||{},raw=lead?.raw||{},stage=String(lead?.cadenceStage||lead?.stage||''),future=recorded.kind==='long-term',condition=recorded.condition||'';
+ const channel=(!lead?.phones?.length&&lead?.emails?.length)||raw.doNotText?'email':'sms';
+ const outcomeId=condition||future?'not-ready':recorded.kind==='review'?'wrong':recorded.kind==='connected'?'reply':'no-response';
+ return {leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId:lead?.contextConflict?'hygiene':condition?'conditional':future||/^nurture$/i.test(stage)?'timing':/^closed$/i.test(stage)?'relationship':lead?.leadLane==='seller'?'seller':'new',outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
+};
 export const normalize=(text:string)=>text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export const contextKey=(c:Context)=>JSON.stringify(c);
 const validTime=(value:string)=>Number.isFinite(Date.parse(value));
@@ -43,11 +48,16 @@ const consult=['Would a brief conversation with your broker be helpful?','Would 
 const availability=['What day and time window would suit you? Your broker will confirm availability.','Which day would work best for a conversation? The time will need broker confirmation.','Could you share a preferred time window so your broker can check availability?','When would you like your broker to check for a suitable appointment time?'];
 const closings=['We can take this at your pace.','The next step is yours to choose.','No commitment is needed to ask a question.','Your broker can help when it is useful to you.'];
 const uniqueId=(id:string,w:Workspace)=>{if(!id||w.drafts.some(d=>d.id===id)||w.history.some(h=>h.id===id)||w.results.some(r=>r.id===id)||(w.held||[]).some(r=>r.id===id))throw new Error('A unique event ID is required.');};
-export function assemble(w:Workspace,c:Context,id:string,now=new Date()):Workspace{
- restore(w);uniqueId(id,w);const blocked=gate(c);if(blocked)throw new Error(blocked);
+// Preparing wording is separate from authorizing outreach. Keep the original
+// unconfirmed consent and identity fields in the draft's actual context.
+export const preparationGate=(c:Context)=>gate({...c,identityVerified:true,consent:true});
+export const prepare=(w:Workspace,c:Context,id:string,now=new Date())=>buildDraft(w,c,id,now,true);
+export const assemble=(w:Workspace,c:Context,id:string,now=new Date())=>buildDraft(w,c,id,now,false);
+function buildDraft(w:Workspace,c:Context,id:string,now:Date,preparation:boolean):Workspace{
+ restore(w);uniqueId(id,w);const blocked=preparation?preparationGate(c):gate(c);if(blocked)throw new Error(blocked);
  if(w.history.length>=20000||w.drafts.length>=20000)throw new Error('Review history is full; export and reconcile it before generating more drafts.');
  const p=paths.find(p=>p.id===c.pathId)!;
- const ask=step(c)==='Permission / wait'?permission:c.outcomeId==='request'?availability:c.outcomeId==='reply'?clarify:consult;
+ const ask=step({...c,identityVerified:true,consent:true})==='Permission / wait'?permission:c.outcomeId==='request'?availability:c.outcomeId==='reply'?clarify:consult;
  // Every full text is checked against every saved proposal/edit, not a random
  // seed or cosmetic nonce. Finite supply exhausts into review, never repetition.
  const used=new Set(w.history.map(h=>normalize(h.body)));
@@ -69,8 +79,10 @@ export function edit(w:Workspace,id:string,body:string,eventId:string,now=new Da
  if(w.history.length>=20000)throw new Error('Review history is full; export and reconcile it first.');
  return {...w,drafts:w.drafts.map(x=>x.id===id?{...x,body,revision:x.revision+1,approvedKey:null,status:'draft'}:x),history:[...w.history,{id:eventId,leadId:d.leadId,body,at:now.toISOString(),decisionId:id,kind:'edited'}]};
 }
-export function approve(w:Workspace,c:Context,id:string):Workspace{
- restore(w);const blocked=gate(c);if(blocked)throw new Error(blocked);const d=w.drafts.find(x=>x.id===id);
+export const reviewDraft=(w:Workspace,c:Context,id:string)=>review(w,c,id,true);
+export const approve=(w:Workspace,c:Context,id:string)=>review(w,c,id,false);
+function review(w:Workspace,c:Context,id:string,preparation:boolean):Workspace{
+ restore(w);const blocked=preparation?preparationGate(c):gate(c);if(blocked)throw new Error(blocked);const d=w.drafts.find(x=>x.id===id);
  if(!d||d.contextKey!==contextKey(c)||d.leadId!==c.leadId||w.drafts.filter(x=>x.leadId===c.leadId).at(-1)?.id!==id||!['draft','approved'].includes(d.status))throw new Error('Contact context or draft changed; generate and review a fresh draft.');
  if(!d.body.trim())throw new Error('The proposed message is empty.');
  if(w.history.some(h=>h.decisionId!==id&&normalize(h.body)===normalize(d.body)))throw new Error('This wording was already proposed. Edit it or generate a distinct version.');

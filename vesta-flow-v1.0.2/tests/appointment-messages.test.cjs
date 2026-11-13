@@ -102,3 +102,36 @@ test('engine and UI do not invoke FUB writeback,queue actions or external messag
   const source=fs.readFileSync(require('node:path').join(__dirname,'..',file),'utf8');assert.doesNotMatch(source,/fetch\(|appendFlowEvent|writeback|\/api\/flow\/actions|setInterval\(/);
  }
 });
+
+test('preparation autofills a draft without fabricating identity review or channel consent',()=>{
+ const c=e.contextFor({id:42,name:'Sample Buyer',stage:'Lead',leadLane:'buyer',source:'Website'}),w=e.prepare(e.emptyWorkspace(),c,'auto1',now);
+ assert.ok(w.drafts[0].body);assert.equal(c.consent,false);assert.equal(c.identityVerified,false);assert.equal(w.drafts[0].contextKey,e.contextKey(c));
+ const reviewed=e.reviewDraft(w,c,'auto1');assert.equal(reviewed.drafts[0].status,'approved');assert.throws(()=>e.simulate(reviewed,c,'auto1',true,'send',later),/Confirm/);
+ for(const patch of [{source:'Zenlist'},{dnc:true},{pathId:'hygiene'},{outcomeId:'stop'}])assert.throws(()=>e.prepare(e.emptyWorkspace(),{...c,...patch},'blocked',now));
+});
+test('recorded intent and cadence stage autofill conservative nurture wording',()=>{
+ const c=e.contextFor({id:42,name:'Sample Seller',stage:'Lead',cadenceStage:'Nurture',leadLane:'seller',contactContext:{kind:'long-term',condition:'Only if plans change next year'}});
+ assert.equal(c.pathId,'conditional');assert.equal(c.outcomeId,'not-ready');assert.match(e.prepare(e.emptyWorkspace(),c,'auto2',now).drafts[0].body,/later check-in|when we check in|check back|pause here/);
+ assert.equal(e.contextFor({id:43,stage:'Nurture',leadLane:'buyer'}).pathId,'timing');
+ assert.equal(e.contextFor({id:44,leadLane:'buyer',contactContext:{kind:'attempted'}}).outcomeId,'no-response');
+ assert.equal(e.contextFor({id:45,contextConflict:true}).pathId,'hygiene');
+});
+test('email fallback respects do-not-text without granting email permission',()=>{
+ const c=e.contextFor({id:42,phones:['555'],emails:['sample@example.test'],raw:{doNotText:true}});
+ assert.equal(c.channel,'email');assert.equal(c.dnc,false);assert.equal(c.consent,false);
+ assert.equal(e.contextFor({id:43,raw:{doNotText:true,doNotEmail:true}}).dnc,true);
+});
+const {messagingQueue,hasRecordedConversation}=require('../lib/appointment/priority.ts');
+const queued=(id,extra={},item={})=>({leadId:String(id),effectiveOwnerId:30,priorityScore:100,priorityLabel:'Today',position:id,relationship:{},lead:{id,name:'Synthetic '+id,stage:'Lead',source:'Website',leadLane:'buyer',cadenceStatus:'overdue',...extra},...item});
+test('message priority puts no recorded conversation ahead of contacted leads, then cadence urgency',()=>{
+ const items=[queued(1,{documentedContactAt:now.toISOString(),cadenceDaysLate:30},{priorityLabel:'Immediate'}),queued(2,{cadenceStatus:'due'}),queued(3,{cadenceDaysLate:2}),queued(4,{cadenceDaysLate:6})];
+ assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['4','3','2','1']);
+ assert.equal(hasRecordedConversation({brokerOutreachAt:now.toISOString(),lastCommunicationAt:now.toISOString(),contactContext:{kind:'attempted'}}),false);
+ assert.equal(hasRecordedConversation({contactContext:{contactEstablished:true}}),true);
+});
+test('message list cannot resurrect suppressed roster leads, future followups, duplicate sources or other brokers',()=>{
+ const items=[queued(1),queued(2,{source:'Zenlist'}),queued(3,{stage:'Recruiting'}),queued(4,{leadLane:'renter'}),queued(5,{}, {effectiveOwnerId:31}),queued(6,{cadenceStatus:'current',brokerOutreachAt:now.toISOString()}),queued(7,{nextActionAt:later.toISOString()}),queued(8,{contextConflict:true}),queued(9,{raw:{doNotContact:true}})];
+ assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['1']);assert.deepEqual(messagingQueue(items,null),[]);
+ const routed=queued(10,{assignedUserId:31},{effectiveOwnerId:30});assert.equal(messagingQueue([routed],30).length,1);
+ assert.equal(messagingQueue([queued(11,{cadenceStatus:'current'},{relationship:{recentRequest:true}})],30).length,1);
+});
