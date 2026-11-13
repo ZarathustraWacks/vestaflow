@@ -1,5 +1,5 @@
 /** Versioned deterministic contact context shared by all operational consumers. */
-export const CONTACT_CONTEXT_VERSION='vesta-contact-context-v1';
+export const CONTACT_CONTEXT_VERSION='vesta-contact-context-v2';
 export const validContextDate=(value:any,now=Date.now()):string|null=>typeof value==='string'&&/(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value))&&Date.parse(value)<=now?value:null;
 export const contextCreatedAt=(row:any,now:number)=>validContextDate(row.sent??row.startedAt??row.created??row.createdAt,now);
 const plain=(value:any)=>String(value||'').replace(/<\s*(br\s*\/?|\/p|\/div|\/li)\s*>/gi,'\n').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&');
@@ -12,7 +12,9 @@ export function communicationOutcome(note:any,now=Date.now()){
  const body=plain(note.body??note.text);
  const flow=String(note.subject||'')==='Vesta Flow · Done'&&body.includes('Recorded from Vesta Flow.')&&/\[Vesta Flow sync: [a-f0-9]{24}\]/.test(body);
  const explicit=typeof note.outcome==='string'?note.outcome:typeof note.outcome?.name==='string'?note.outcome.name:null;
- const outcome=field(body,'Call Outcome')||field(body,'Communication Outcome')||explicit||(flow?field(body,'Outcome'):null);
+ const category=field(body,'Category')||String(note.category||'');
+ const consultation=/^shilo(?:\b|$)/i.test(source)&&/^(?:initial|buyer|seller) consultation(?:\s+summary\b.*)?$/i.test(category);
+ const outcome=field(body,'Call Outcome')||field(body,'Communication Outcome')||explicit||(flow?field(body,'Outcome'):null)||(consultation?'Connected conversation':null);
  if(!outcome)return null;
  const normalized=outcome.toLowerCase().replace(/[-_—–]/g,' ').replace(/\s+/g,' ').trim();
  if(flow&&!/^(connected conversation|outbound call no answer|left voicemail|outbound text sent|outbound email sent|client not ready)$/.test(normalized))return null;

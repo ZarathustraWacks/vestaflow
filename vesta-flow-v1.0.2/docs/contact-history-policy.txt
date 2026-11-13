@@ -1,0 +1,33 @@
+Historical contact policy
+
+Verified lifetime conversation history is separate from latest broker outreach,
+latest customer response, intent and the active follow-up clock. Later attempts
+can advance outreach/cadence without deleting an earlier conversation.
+
+The source retains compact per-person proof from the existing calls/text mirror
+pass: an explicitly outbound event before a valid inbound event, with evidence
+IDs and original event times. Failed, automated, unknown-direction, future and
+post-snapshot edits do not establish a pair. No message bodies are transported.
+No vendor history rescan, FUB mutation or broker performance credit is added.
+
+The shared TypeScript rule reads this identity-bound projection and all known
+summary channels. Prior conversation / history needs review / no conversation
+recorded remain distinct. An unpaired inbound event is a review signal, never
+proof that a lead is untouched. Advanced actual CRM stages and verified connected
+app outcomes remain valid; a derived nurture tag is not proof of conversation.
+
+Structured Shilo consultation categories now count as documented contact. Free
+prose, suggested or canceled consultations and generic sync notes do not. Parser
+v2 forces a policy rebuild from retained evidence at the original snapshot cutoff.
+Source timestamps are preserved, so policy compilation does not pretend to be a
+fresh vendor pull. Raw CRM data and existing source/consumer isolation remain.
+
+Flow, Cadence/reroute, the source manager compiler, the Flow target compiler, and
+the independent Cadence routing compiler share the contract. Scaffolding and
+proto carry the same lifetime rule without changing their original views.
+
+Messaging updates dropdown history labels from the selected current FUB record.
+Unmapped nurture remains planning work and does not authorize automatic drafts.
+Appointment-set/met records require verification instead of another generic
+appointment pitch. Newest-created ordering, manual FUB sending and the existing
+Done sync workflow remain. No live sender or training promotion is enabled.

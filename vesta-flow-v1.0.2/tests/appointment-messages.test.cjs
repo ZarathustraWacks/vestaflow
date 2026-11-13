@@ -128,6 +128,7 @@ test('equal or missing creation times prioritize no recorded conversation, then 
  assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['4','3','2','1']);
  assert.equal(hasRecordedConversation({brokerOutreachAt:now.toISOString(),lastCommunicationAt:now.toISOString(),contactContext:{kind:'attempted'}}),false);
  assert.equal(hasRecordedConversation({contactContext:{contactEstablished:true}}),true);
+ assert.deepEqual(messagingQueue([queued(1,{documentedContactAt:now.toISOString()}),queued(2,{customerResponseAt:now.toISOString()}),queued(3)],30,now.getTime()).map(x=>x.id),['3','2','1']);
 });
 test('message list cannot resurrect suppressed roster leads, future followups, duplicate sources or other brokers',()=>{
  const items=[queued(1),queued(2,{source:'Zenlist'}),queued(3,{stage:'Recruiting'}),queued(4,{leadLane:'renter'}),queued(5,{}, {effectiveOwnerId:31}),queued(6,{cadenceStatus:'current',brokerOutreachAt:now.toISOString()}),queued(7,{nextActionAt:later.toISOString()}),queued(8,{contextConflict:true}),queued(9,{raw:{doNotContact:true}})];
@@ -139,4 +140,14 @@ test('message list cannot resurrect suppressed roster leads, future followups, d
 test('newest original creation sorts first regardless of activity updates, with invalid dates last',()=>{
  const items=[queued(1,{createdAt:'2026-11-10T12:00:00Z',updatedAt:now.toISOString()}),queued(2,{createdAt:'2026-11-12T12:00:00Z',documentedContactAt:now.toISOString()}),queued(3,{createdAt:'2026-11-11T12:00:00Z'}),queued(4,{createdAt:'invalid'}),queued(5,{createdAt:'2099-01-01T00:00:00Z'})];
  assert.deepEqual(messagingQueue(items,30,now.getTime()).map(x=>x.id),['2','3','1','4','5']);
+});
+
+test('unmapped nurture is held for planning and an existing appointment cannot get a generic acquisition draft',()=>{
+ const unknown=e.contextFor({id:42,stage:'Nurture',leadLane:'seller',cadenceStatus:'unknown'});
+ assert.equal(unknown.pathId,'timing');assert.equal(unknown.cadencePlanningRequired,true);assert.throws(()=>e.prepare(e.emptyWorkspace(),unknown,'plan',now),/follow-up plan/i);
+ const booked=e.contextFor({id:43,stage:'Appointment Set',leadLane:'buyer'});
+ const fresh=e.contextFor({id:44,stage:'Nurture',cadenceStatus:'unknown',handRaiseAt:'2026-01-01T00:00:00Z',customerResponseAt:new Date(Date.now()-60000).toISOString(),brokerOutreachAt:'2026-01-01T00:00:00Z'});assert.equal(fresh.cadencePlanningRequired,undefined);
+ assert.equal(booked.outcomeId,'appointment-set');assert.throws(()=>e.prepare(e.emptyWorkspace(),booked,'booked',now),/appointment/);
+ const planning=queued(42,{stage:'Nurture',cadenceStatus:'unknown'});
+ assert.deepEqual(messagingQueue([planning],30,now.getTime()),[]);
 });
