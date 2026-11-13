@@ -9,11 +9,12 @@ export function messagingEligible(lead:any){
 }
 export function messagingQueue(queue:any[],brokerId:number|null,now=Date.now()){
  if(brokerId===null)return [];
+ const created=(lead:any)=>{const at=Date.parse(lead.createdAt||'');return Number.isFinite(at)&&at<=now?at:0};
  const urgency:Record<string,number>={Immediate:4,Today:3,'This week':2,Monitor:1};
  const cadence:Record<string,number>={overdue:3,due:2,unknown:1};
  return queue.filter(item=>Number(item.effectiveOwnerId)===brokerId&&messagingEligible(item.lead))
   .filter(item=>item.lead.cadenceStatus!=='current'||item.relationship?.needsContactNow||item.relationship?.recentRequest||item.relationship?.dueTask)
   .filter(item=>!item.lead.nextActionAt||Date.parse(item.lead.nextActionAt)<=now||item.relationship?.needsContactNow||item.relationship?.recentRequest||item.relationship?.dueTask)
-  .sort((a,b)=>Number(hasRecordedConversation(a.lead))-Number(hasRecordedConversation(b.lead))||(cadence[b.lead.cadenceStatus]||0)-(cadence[a.lead.cadenceStatus]||0)||(urgency[b.priorityLabel]||0)-(urgency[a.priorityLabel]||0)||Number(b.lead.cadenceDaysLate||0)-Number(a.lead.cadenceDaysLate||0)||b.priorityScore-a.priorityScore||Number(a.position||0)-Number(b.position||0))
+  .sort((a,b)=>created(b.lead)-created(a.lead)||Number(hasRecordedConversation(a.lead))-Number(hasRecordedConversation(b.lead))||(cadence[b.lead.cadenceStatus]||0)-(cadence[a.lead.cadenceStatus]||0)||(urgency[b.priorityLabel]||0)-(urgency[a.priorityLabel]||0)||Number(b.lead.cadenceDaysLate||0)-Number(a.lead.cadenceDaysLate||0)||b.priorityScore-a.priorityScore||Number(a.position||0)-Number(b.position||0))
   .map(item=>({...item.lead,id:String(item.leadId),messagePriority:item.priorityLabel,messageReason:!hasRecordedConversation(item.lead)?'No recorded customer conversation':item.lead.cadenceLabel||'Cadence follow-up due'}));
 }
