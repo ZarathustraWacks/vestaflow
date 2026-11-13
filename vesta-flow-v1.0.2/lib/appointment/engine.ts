@@ -1,6 +1,7 @@
 import {contactHistoryState} from '../policy/contact-history';
 import {paths,outcomes} from './catalog';
-export type Context={leadId:string;name:string;stage:string;source:string;lane:string;consent:boolean;dnc:boolean;sourceDnc:boolean;pathId:string;outcomeId:string;condition:string;conditionCleared:boolean;managerReason:string;identityVerified:boolean;channel:'sms'|'email';snapshotId:string;cadencePlanningRequired?:boolean};
+import {MESSAGE_POLICY_VERSION,messageLanguage,recordedTopic,coachingSources} from './playbook';
+export type Context={leadId:string;name:string;stage:string;source:string;lane:string;consent:boolean;dnc:boolean;sourceDnc:boolean;pathId:string;outcomeId:string;condition:string;conditionCleared:boolean;managerReason:string;identityVerified:boolean;channel:'sms'|'email';snapshotId:string;cadencePlanningRequired?:boolean;messagePolicyVersion?:string;topicPathId?:string};
 export type Draft={id:string;leadId:string;snapshotId:string;body:string;revision:number;contextKey:string;approvedKey:string|null;pathId:string;outcomeId:string;at:string;mode:'review-only';status:'draft'|'approved'|'held'|'simulated-delivery'|'simulated-failure'};
 export type History={id:string;leadId:string;body:string;at:string;decisionId:string;kind:'proposed'|'edited'|'simulated-delivery'|'simulated-failure'};
 export type Result={id:string;decisionId:string;kind:'customer_response'|'appointment_set';at:string;appointmentId?:string;verification:'simulated'};
@@ -12,10 +13,12 @@ export const contextFor=(lead:any):Context=>{
  const channel=(!lead?.phones?.length&&lead?.emails?.length)||raw.doNotText?'email':'sms';
  const appointment=/^appointment (set|met)$/i.test(stage),requestAt=Math.max(0,...[lead?.handRaiseAt,lead?.customerResponseAt].map(value=>Date.parse(value||'')).filter(Number.isFinite)),outreachAt=Date.parse(lead?.brokerOutreachAt||''),freshRequest=Number.isFinite(requestAt)&&requestAt<=Date.now()&&Date.now()-requestAt<=7*86400000&&(!Number.isFinite(outreachAt)||requestAt>outreachAt),planMissing=lead?.cadenceStatus==='unknown'&&/^nurture$/i.test(stage)&&!freshRequest;
  const outcomeId=appointment?'appointment-set':condition||future?'not-ready':recorded.kind==='review'?'wrong':recorded.kind==='connected'||contactHistoryState(lead)==='prior-conversation'?'reply':'no-response';
- return {...(planMissing?{cadencePlanningRequired:true}:{}),leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId:lead?.contextConflict?'hygiene':appointment?'appointment':condition?'conditional':future||/^nurture$/i.test(stage)?'timing':/^closed$/i.test(stage)?'relationship':lead?.leadLane==='seller'?'seller':'new',outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
+ const topicPathId=recordedTopic(recorded),pathId=lead?.contextConflict?'hygiene':appointment?'appointment':condition?'conditional':future?'timing':/^closed$/i.test(stage)?'relationship':topicPathId||(/^nurture$/i.test(stage)?'timing':lead?.leadLane==='seller'?'seller':'new');
+ return {messagePolicyVersion:MESSAGE_POLICY_VERSION,...(topicPathId?{topicPathId}:{}),...(planMissing?{cadencePlanningRequired:true}:{}),leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId,outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
 };
 export const normalize=(text:string)=>text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export const contextKey=(c:Context)=>JSON.stringify(c);
+export const draftDisposition=(draft:Draft|undefined,c:Context)=>!draft?'prepare':draft.contextKey===contextKey(c)?'reuse':draft.status==='held'?'keep-held':draft.revision>1?'keep-edits':'prepare';
 const validTime=(value:string)=>Number.isFinite(Date.parse(value));
 export function restore(value:unknown):Workspace{
  const w=value as Workspace;
@@ -44,12 +47,18 @@ export function step(c:Context){
  if(c.outcomeId==='not-ready'||(c.condition&&!c.conditionCleared)||path?.wait&&c.outcomeId==='no-response')return 'Permission / wait';
  return outcome?.next==='availability'?'Preferred appointment window':outcome?.next==='qualify'?'Clarify the need':'Offer a consultation';
 }
-const openings=['Hello','Hi','Good day','A quick check-in','Checking in','Just reaching out'];
-const permission=['Would a later check-in be useful, or would you prefer to reach out when you are ready?','Would you like to choose when we check in again?','Is there a time you would prefer us to check back?','Would you prefer to pause here and contact your broker when the timing works?'];
-const clarify=['What would be most useful to work through first?','Which question would you like your broker to focus on first?','What information would help you decide on a useful next step?','What would you like to clarify before making further plans?'];
-const consult=['Would a brief conversation with your broker be helpful?','Would you like to arrange a short planning conversation?','Would you be open to a brief consultation about your next step?','Would it help to find a time to talk through your options?'];
-const availability=['What day and time window would suit you? Your broker will confirm availability.','Which day would work best for a conversation? The time will need broker confirmation.','Could you share a preferred time window so your broker can check availability?','When would you like your broker to check for a suitable appointment time?'];
-const closings=['We can take this at your pace.','The next step is yours to choose.','No commitment is needed to ask a question.','Your broker can help when it is useful to you.'];
+export function messagePlan(c:Context){
+ const blocked=preparationGate(c),waiting=step({...c,identityVerified:true,consent:true})==='Permission / wait';
+ if(blocked)return {goal:c.dnc||c.sourceDnc||c.outcomeId==='stop'?'Stop outreach':'Review before outreach',route:[blocked],focus:'',waiting:false};
+ const language=messageLanguage(c.pathId,c.topicPathId);
+ return {goal:waiting?'Agree a check-in':c.outcomeId==='reply'?'Understand the next need':['ready','request'].includes(c.outcomeId)?'Request an appointment window':'Earn a reply and offer a short call',focus:language.focus,waiting,
+  route:waiting?['Permission for a later check-in','Customer confirms readiness','Useful planning conversation','Preferred window','Broker verifies appointment']:c.outcomeId==='reply'?['Clarify one need','Offer a focused planning conversation','Preferred window','Broker verifies appointment']:['Useful planning conversation','Preferred window','Broker verifies appointment']};
+}
+const permission=[
+ 'Would you like to choose when we check in again, or reach out when you are ready?',
+ 'Would a later check-in be useful, or would you prefer to keep the next step in your hands?',
+ 'Is there a time you would prefer me to check back, or should I wait to hear from you?',
+ 'Would you prefer to pause here and get in touch when a planning conversation would help?'];
 const uniqueId=(id:string,w:Workspace)=>{if(!id||w.drafts.some(d=>d.id===id)||w.history.some(h=>h.id===id)||w.results.some(r=>r.id===id)||(w.held||[]).some(r=>r.id===id))throw new Error('A unique event ID is required.');};
 // Preparing wording is separate from authorizing outreach. Keep the original
 // unconfirmed consent and identity fields in the draft's actual context.
@@ -59,17 +68,24 @@ export const assemble=(w:Workspace,c:Context,id:string,now=new Date())=>buildDra
 function buildDraft(w:Workspace,c:Context,id:string,now:Date,preparation:boolean):Workspace{
  restore(w);uniqueId(id,w);const blocked=preparation?preparationGate(c):gate(c);if(blocked)throw new Error(blocked);
  if(w.history.length>=20000||w.drafts.length>=20000)throw new Error('Review history is full; export and reconcile it before generating more drafts.');
- const p=paths.find(p=>p.id===c.pathId)!;
- const ask=step({...c,identityVerified:true,consent:true})==='Permission / wait'?permission:c.outcomeId==='request'?availability:c.outcomeId==='reply'?clarify:consult;
+ const language=messageLanguage(c.pathId,c.topicPathId),plan=messagePlan(c);
+ const invitations=[`Would a five-minute call about ${language.focus} be useful?`,`Would you be open to a short conversation about ${language.focus}?`,`Could we find five minutes to work through ${language.focus}?`,`Would you like to arrange a quick planning call about ${language.focus}?`];
+ const availability=[`What day and time window would work for a short call about ${language.focus}? I will check availability before confirming.`,`When would you prefer to talk through ${language.focus}? I will verify the time before anything is booked.`,`Could you share a preferred window for a conversation about ${language.focus}? I will check the calendar first.`,`What time window would suit you for a planning call about ${language.focus}? We can confirm the details once availability is checked.`];
+ const clarify=[language.question,`Before we plan a call, ${language.question.charAt(0).toLowerCase()+language.question.slice(1)}`,`To make a planning conversation useful, ${language.question.charAt(0).toLowerCase()+language.question.slice(1)}`,`So we can focus on the right next step, ${language.question.charAt(0).toLowerCase()+language.question.slice(1)}`];
+ const ask=plan.waiting?permission:['ready','request'].includes(c.outcomeId)?availability:c.outcomeId==='reply'?clarify:invitations;
  // Every full text is checked against every saved proposal/edit, not a random
  // seed or cosmetic nonce. Finite supply exhausts into review, never repetition.
  const used=new Set(w.history.map(h=>normalize(h.body)));
  let body='';const candidates:string[]=[];
- for(const opening of openings)for(const idea of p.ideas)for(const question of ask)for(const close of closings){
-  const candidate=`${opening}${c.name.trim()?`, ${c.name.trim().split(/\s+/)[0]}`:''}. ${idea} ${question} ${close}`;
+ // Time-of-day greetings are deliberately avoided: the broker chooses when to send.
+ const greetings=['Hi','Hello','Hi there','Hello there','A quick note','Checking in'];
+ for(const opening of greetings)for(const idea of language.values)for(const question of ask){
+  const name=c.name.trim().split(/\s+/)[0]?.replace(/[\r\n<>]/g,'').slice(0,60),salutation=`${opening}${name?`, ${name}`:''}`;
+  const introduction=c.outcomeId==='no-response'?"I'm with Vesta Preferred. ":'';
+  const candidate=c.channel==='email'?`${salutation},\n\n${introduction}${idea}\n\n${question}\n\nVesta Preferred`:`${salutation} — ${introduction}${idea} ${question}`;
   candidates.push(candidate);
  }
- const start=(w.drafts.length*89)%candidates.length;
+ const start=(w.drafts.length*29)%candidates.length;
  for(let i=0;i<candidates.length;i++){const candidate=candidates[(start+i)%candidates.length];if(!used.has(normalize(candidate))){body=candidate;break}}
  if(!body)throw new Error('Distinct approved wording is exhausted for this path. Review new language instead of repeating a draft.');
  const draft:Draft={id,leadId:c.leadId,snapshotId:c.snapshotId,body,revision:1,contextKey:contextKey(c),approvedKey:null,pathId:c.pathId,outcomeId:c.outcomeId,at:now.toISOString(),mode:'review-only',status:'draft'};
@@ -114,7 +130,7 @@ export function hold(w:Workspace,c:Context,id:string,reason:string,eventId:strin
  const candidate:TrainingCandidate={id:eventId,decisionId:id,leadId:d.leadId,revision:d.revision,snapshotId:d.snapshotId,draftContextKey:d.contextKey,originalBody:original?.body||d.body,editedBody:d.body,reason:reason.trim().slice(0,2000),context:{...c},at:now.toISOString(),reviewStatus:'pending',trainingEligible:false,sent:false};
  return {...checked,drafts:checked.drafts.map(x=>x.id===id?{...x,status:'held',approvedKey:null}:x),held:[...checked.held,candidate]};
 }
-export function exportReview(w:Workspace,c:Context){return {contract:'vesta-appointment-message-v1',mode:'simulation',productionWrites:false,dispatchEnabled:false,trainingEligible:false,brokerCredit:false,timerEffect:'none',appointmentSetVerified:false,historyScope:'this browser only; cross-device delivery deduplication not configured',context:c,trainingCandidates:w.held||[],
+export function exportReview(w:Workspace,c:Context){return {contract:'vesta-appointment-message-v1',messagePolicyVersion:MESSAGE_POLICY_VERSION,coachingSources,appointmentPlan:messagePlan(c),mode:'simulation',productionWrites:false,dispatchEnabled:false,trainingEligible:false,brokerCredit:false,timerEffect:'none',appointmentSetVerified:false,historyScope:'this browser only; cross-device delivery deduplication not configured',context:c,trainingCandidates:w.held||[],
  decisions:w.drafts.map(d=>({decision_id:d.id,lead_id:d.leadId,actor_id:'automation:test',selected_action:'appointment-message-review',created_at:d.at,status:d.status,revision:d.revision,body:d.body,verification_status:'simulated',snapshot_id:d.snapshotId})),
  outcomes:w.results.map(r=>({lead_id:w.drafts.find(d=>d.id===r.decisionId)?.leadId,decision_id:r.decisionId,outcome_type:r.kind,occurred_at:r.at,evidence_external_id:r.id,evidence_source:'appointment-workspace-simulated',payload:{simulation:true,trainingEligible:false,appointmentId:r.appointmentId||null}})),history:w.history};}
 export function dispatch(){throw new Error('Live message delivery is not configured. This workspace only prepares and tests reviewed messages.');}
