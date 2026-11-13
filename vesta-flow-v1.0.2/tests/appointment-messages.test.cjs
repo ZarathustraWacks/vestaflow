@@ -26,10 +26,10 @@ test('no-response attempt does not assert a conversation, booking or verified co
  assert.equal(contract.brokerCredit,false);assert.equal(contract.timerEffect,'none');assert.equal(contract.appointmentSetVerified,false);
  assert.doesNotMatch(w.drafts[0].body,/appointment is booked|confirmed your|thanks for your reply/i);
 });
-test('all384 distinct combinations exhaust into review without repeated or nonce wording',()=>{
+test('all96 distinct combinations exhaust into review without repeated or nonce wording',()=>{
  const c=ctx();let w=e.emptyWorkspace();const bodies=new Set();
- for(let i=0;i<384;i++){w=generate(c,w,'d'+i);const text=e.normalize(w.drafts.at(-1).body);assert.equal(bodies.has(text),false);bodies.add(text)}
- assert.throws(()=>generate(c,w,'exhausted'),/exhausted/);assert.equal(bodies.size,384);
+ for(let i=0;i<96;i++){w=generate(c,w,'d'+i);const text=e.normalize(w.drafts.at(-1).body);assert.equal(bodies.has(text),false);bodies.add(text)}
+ assert.throws(()=>generate(c,w,'exhausted'),/exhausted/);assert.equal(bodies.size,96);
 });
 test('saved/reloaded history blocks repeats and is not silently reset',()=>{
  const c=ctx(),first=generate(c),restored=e.restore(JSON.parse(JSON.stringify(first))),next=generate(c,restored,'d2');
@@ -37,7 +37,7 @@ test('saved/reloaded history blocks repeats and is not silently reset',()=>{
 });
 test('successive drafts vary the message substance rather than only a closing or nonce',()=>{
  const c=ctx(),first=generate(c),next=generate(c,first,'d2');
- const core=body=>body.split('. ').slice(1,-1).join('. ');
+ const core=body=>body.split(' — ').slice(1).join(' — ');
  assert.notEqual(core(first.drafts[0].body),core(next.drafts[1].body));
 });
 test('draft can be freely edited and edit removes approval',()=>{

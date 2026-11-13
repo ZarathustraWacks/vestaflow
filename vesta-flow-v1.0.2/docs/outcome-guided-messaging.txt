@@ -1,0 +1,53 @@
+Outcome-guided appointment messaging — review build, November 12, 2026
+
+Purpose
+Replace generic rotating prose with a useful offer and one next-step question,
+selected from the existing nurture taxonomy and current person-bound evidence.
+Brokers keep the same editable message, manual FUB send, Hold and sync workflow.
+
+Guidance reviewed
+- Historical nurture research, November 5: 11,483 people and 17 overlapping
+  discovery categories. Counts do not prove a person's present intent.
+- Departments/AI/Documents to begin the build/Meetings and notes in relationship
+  to the SOP build out /Round 1 chats - before Arsenii/1-10-2026 meeting notes
+  from sop meeting with Joey /transcript.txt. Discussion is dated January 9.
+  Appointment, listening, motivation; explain a short planning call's value.
+- Departments/Tuesday company meetings/Associate Training/3-10/transcript.txt:
+  appointment method/access, full address, links, collaborators; team channels.
+- Departments/Agent Development /Partner meetings/transcript.txt, January 30:
+  distinguish tentative scheduling and confirmed events; respect personal time.
+These are dated operational discussions, not proof every proposed automation or
+historical timer was approved. No old four-hour rule, cancellation rule, legal
+claim, lender promotion, market statistic or unverified report/link was added.
+
+Outcome tree
+No response -> useful offer + five-minute call invitation -> reply.
+Conversation -> one relevant qualification question -> readiness.
+Ready / appointment requested -> preferred time window -> calendar verification.
+Not ready / active condition -> permission for check-in -> confirmed readiness.
+Only verified appointment details can establish appointment set.
+Opt-out stops outreach. Wrong/represented/invalid, duplicate/conflict, excluded
+stage and missing nurture plan hold for review. Every sendable branch has a
+planning-call purpose; stop/review branches are valid endpoints, never sales pushes.
+
+Data and wording
+Person-bound contactContext outcome/condition/timeframe can suggest a topic.
+Ambiguous multiple topics require broker selection. Raw notes, manager prose,
+aggregate keyword counts and tags do not silently become customer intent.
+Condition text remains broker-visible context, not copied into the outgoing draft.
+Explicit conditions override ready/request until the customer confirms a change.
+No past conversation, property availability, rate, financing approval, calendar
+slot or attachment is invented. SMS is concise; email uses separate paragraphs.
+
+Version and history
+nurture-appointment-v2 invalidates untouched generic suggestions. Existing edited
+and held drafts are preserved for review rather than automatically overwritten.
+For each fixed path/outcome/name/channel there are 96 text combinations. All saved
+proposals/edits remain in normalized duplicate checks, including held proposals.
+Exhaustion holds for reviewed new wording; uniqueness is browser-scoped, not global.
+Held samples remain unsent, pending review and ineligible for automatic training.
+
+Scope
+Flow frontend only. No changes to Render, Cadence, source collection, queue order,
+original-incoming timers, broker credit, daily goal, writeback or sending access.
+The draft policy provides suggestions; it does not execute outreach or scheduling.
