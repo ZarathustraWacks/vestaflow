@@ -6,7 +6,8 @@ export type Draft={id:string;leadId:string;snapshotId:string;body:string;revisio
 export type History={id:string;leadId:string;body:string;at:string;decisionId:string;kind:'proposed'|'edited'|'simulated-delivery'|'simulated-failure'};
 export type Result={id:string;decisionId:string;kind:'customer_response'|'appointment_set';at:string;appointmentId?:string;verification:'simulated'};
 export type TrainingCandidate={id:string;decisionId:string;leadId:string;revision:number;snapshotId:string;draftContextKey:string;originalBody:string;editedBody:string;reason:string;context:Context;at:string;reviewStatus:'pending';trainingEligible:false;sent:false};
-export type Workspace={version:1;history:History[];drafts:Draft[];results:Result[];held:TrainingCandidate[]};
+export type EditorState={context:Context;baseKey:string;holdReason:string};
+export type Workspace={version:1;history:History[];drafts:Draft[];results:Result[];held:TrainingCandidate[];editors?:Record<string,EditorState>;selectedLeadId?:string};
 export const emptyWorkspace=():Workspace=>({version:1,history:[],drafts:[],results:[],held:[]});
 export const contextFor=(lead:any):Context=>{
  const recorded=lead?.contactContext||{},raw=lead?.raw||{},stage=String(lead?.cadenceStage||lead?.stage||''),future=recorded.kind==='long-term',condition=recorded.condition||'';
@@ -25,6 +26,8 @@ export function restore(value:unknown):Workspace{
  if(!w||w.version!==1||!Array.isArray(w.history)||!Array.isArray(w.drafts)||!Array.isArray(w.results)||(w.held!==undefined&&!Array.isArray(w.held))||w.history.length>20000||w.drafts.length>20000||w.results.length>20000||(w.held?.length||0)>20000)throw new Error('Draft history is unavailable or exceeds the review limit. Export it and review before continuing.');
  if(w.history.some(r=>!r||typeof r.id!=='string'||typeof r.body!=='string'||typeof r.leadId!=='string'||!validTime(r.at))||w.drafts.some(d=>!d||typeof d.id!=='string'||typeof d.body!=='string'||typeof d.contextKey!=='string'||!Number.isSafeInteger(d.revision)||!validTime(d.at))||w.results.some(r=>!r||typeof r.id!=='string'||typeof r.decisionId!=='string'||!validTime(r.at)))throw new Error('Stored draft history needs review; it was not silently reset.');
  if((w.held||[]).some(h=>!h||typeof h.id!=='string'||typeof h.decisionId!=='string'||typeof h.leadId!=='string'||typeof h.editedBody!=='string'||typeof h.reason!=='string'||!validTime(h.at)||h.trainingEligible!==false||h.sent!==false||h.reviewStatus!=='pending'))throw new Error('Stored model-review history needs review.');
+ if(w.selectedLeadId!==undefined&&typeof w.selectedLeadId!=='string')throw new Error('Stored contact selection needs review.');
+ if(w.editors!==undefined&&(!w.editors||Array.isArray(w.editors)||typeof w.editors!=='object'||Object.keys(w.editors).length>20000||Object.entries(w.editors).some(([id,e])=>!e||typeof e.baseKey!=='string'||typeof e.holdReason!=='string'||e.holdReason.length>2000||!e.context||e.context.leadId!==id||['pathId','outcomeId','condition','managerReason','channel'].some(k=>typeof (e.context as any)[k]!=='string')||typeof e.context.conditionCleared!=='boolean')))throw new Error('Stored editor choices need review; they were not reset.');
  return {...w,held:w.held||[]};
 }
 export function gate(c:Context){

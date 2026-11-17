@@ -29,3 +29,15 @@ test('Recruiting contacts never enter broker customer queues or escalations',()=
  const {cadencePolicy}=require('../lib/policy/vesta.ts');
  assert.equal(cadencePolicy({lane:'buyer',stage:'Recruiting',tags:[]}).key,'operationally-suppressed');
 });
+
+test('confirmed live Done without optional notes stays completed across its own refreshed snapshot',()=>{
+ const l=lead({decisionSnapshotId:'after-writeback',stage:'Nurture',tags:['Longterm Nurture Monthly'],cadenceStatus:'overdue'});
+ const event={id:'done',leadId:'42',kind:'broker.complete',outcome:'Outbound text sent',note:'',createdAt:ago(.01),decisionSnapshotId:'before-writeback',metadata:{fubSync:{delivered:true,simulated:false}}};
+ assert.deepEqual(buildFlowQueue([l],[event],7),[]);
+ assert.equal(buildFlowQueue([{...l,handRaiseAt:ago(.005)}],[event],7).length,1);
+ assert.equal(buildFlowQueue([l],[{...event,createdAt:ago(31)}],7).length,1);
+});
+test('unconfirmed or simulated completion does not gain live cross-snapshot suppression',()=>{
+ const l=lead({decisionSnapshotId:'new',stage:'Nurture',cadenceStatus:'overdue'});
+ for(const fubSync of [{delivered:false},{delivered:true,simulated:true}])assert.equal(buildFlowQueue([l],[{id:'done',leadId:'42',kind:'broker.complete',outcome:'Outbound text sent',createdAt:ago(.01),decisionSnapshotId:'old',metadata:{fubSync}}],7).length,1);
+});

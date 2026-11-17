@@ -55,13 +55,11 @@ function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
  if(latest.kind==='broker.complete'&&needsBuyerContact(lead)&&['Follow-up task created','Follow-up scheduled','Appointment confirmed'].includes(latest.outcome||''))return false;
  const relationship=flowRelationshipSignals(lead,now);
  if(relationship.pastClient&&relationship.dueTask&&latest.kind==='broker.complete')return false;
- // A broker's completed action may write a note back to FUB. That writeback
- // changes the contact's updated timestamp and therefore produces a new
- // intelligence snapshot, but it does not create a new item for the broker
- // to work. Keep a note-backed completion suppressed across that snapshot
- // boundary; completions without a note retain the original snapshot-bound
- // behavior so genuinely changed intelligence can re-enter the queue.
- if(latest.kind==='broker.complete'&&latest.note)return completionStillHeld(lead,latest,now);
+ // Every confirmed live completion writes a FUB note, even with no optional
+ // broker comment. Its own refresh must not undo that completion. Preserve
+ // the existing cadence interval and new-hand-raise reopening rules.
+ const receipt=latest.metadata?.fubSync as {delivered?:boolean;simulated?:boolean}|undefined;
+ if(latest.kind==='broker.complete'&&(latest.note||(receipt?.delivered===true&&receipt.simulated!==true)))return completionStillHeld(lead,latest,now);
  if(latest.decisionSnapshotId!==lead.decisionSnapshotId)return false;
  if(latest.kind==='broker.complete')return true;
  if(latest.kind==='broker.skip'&&latest.returnAt&&new Date(latest.returnAt).getTime()>now)return true;
