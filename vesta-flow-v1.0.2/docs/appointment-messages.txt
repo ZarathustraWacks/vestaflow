@@ -36,3 +36,6 @@ is reused from My action flow and never sends the copied message again.
 
 Review history and held feedback remain browser-local with export available.
 Cross-device deduplication and central training storage are not implemented.
+
+Draft recovery update: typing is persisted immediately, without requiring Copy or Hold. Working edits coalesce into one history entry per draft. Outcome, channel, condition, manager direction and hold feedback persist per broker/contact; reload resets recipient/permission confirmation. A routine parent rerender does not reload or clear the selected editor. New source evidence preserves edited wording visibly, with an explicit review/rebase step before copying. Current source exclusions and DNC still win. Browser storage failures and known competing-tab writes surface an error and a recovery export; unsaved work warns before browser unload. Storage remains browser-local, not cross-device synchronization.
+The third messaging step now opens the exact contact's existing completion form after a successful queue refresh. The broker must select an outcome and explicitly press Done, sync & next. This step does not send messages. A confirmed live completion remains held across its own writeback snapshot, even when its optional free-text note was empty; original cadence and hand-raise reopening rules still apply.
