@@ -1,0 +1,7 @@
+Flow appearance
+
+Appearance in the sidebar opens a compact background chooser. Clicking a palette or finish previews it; hovering only enlarges the thumbnail. Save choice persists a versioned preference for the selected broker in this browser. Cancel, Escape, the close button and backdrop clicks restore the latest saved preference. Selecting Use original Flow background restores the original canvas. A missing, invalid or unavailable preference uses the original background. Storage failures are visible and never reported as saved.
+
+Six palettes and three static finishes change only the workspace background. Existing cards, typography, navigation, status colors, message editor and actions remain intact. Backgrounds use CSS with no images, dependencies, external calls or animation. Reduced-motion preferences suppress the small hover enlargement. The chooser is keyboard accessible and uses a native modal dialog.
+
+Storage key: vesta.flow.appearance.v1.broker.<brokerId>. Preference storage is local to this browser and origin, not synced across devices. Broker changes close any open preview and load that broker's saved preference. Backgrounds never write to FUB, Render, action history, cadence clocks or appointment drafts. React background updates do not remount the workspace.
