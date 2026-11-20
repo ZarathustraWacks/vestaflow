@@ -50,3 +50,19 @@
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.progressTrack span,.flowTimeline>div>span,.governanceCards i){background:var(--flow-ui-sidebar)}
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) .flowContent :is(button,a,input,select,textarea,summary):focus-visible{outline-color:var(--flow-ui-ink)}
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) .flowContent .flowHeader p{color:var(--flow-ui-canvasInk)}
+
+/* Gallery White: selected natural marble asset with restrained, static glass finishes. */
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]){--flow-glass-surface:linear-gradient(145deg,#ffffffdd,#f6f8fcbf);--flow-glass-shadow:inset 0 1px 0 #ffffff,0 7px 20px #3344540c}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) .flowSidebar{background-image:linear-gradient(#28303912,#28303912),url('/textures/gallery-marble.svg');background-size:100% 100%,cover;background-position:center;background-repeat:no-repeat}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.actionCase,.flowEmpty,.actionDialog,.bulkSchedule,.exceptionRail,.managementCase,.intelHero,.intelBody,.customerWorkspace,.taskWorkspace,.nextChoices button){background-image:var(--flow-glass-surface);border-color:#ffffffdd;box-shadow:var(--flow-glass-shadow)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.nextChoices button.active,.exceptionRail>button.active){background-image:linear-gradient(140deg,#f8fbffdf,#dce5efce);border-color:#aebfce}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.primaryAction,.passReason){background:linear-gradient(145deg,#f5f8fbe6,#e3eaf4c7);border-top:1px solid #ffffffb3;border-bottom:1px solid #ffffffb3;color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span,.customerIntro>strong,.taskSummary,.actionDialog>span,.intelGrid article>span,.customerRow a,.taskRow a,.nextChoices span){color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.caseIdentity,.managementIdentity,.intelHero) h2 a{color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.brokerActions .complete,.dialogActions .primary,.resolveButton,.bulkActions button){background:linear-gradient(160deg,#f8fbffed,#d8e2ebe6);border-color:#ffffff;box-shadow:inset 0 1px 0 #ffffff,0 3px 8px #33445412}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.progressTrack span,.flowTimeline>div>span,.governanceCards i){background:var(--flow-ui-sidebar)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) .flowContent :is(button,a,input,select,textarea,summary):focus-visible{outline-color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) .flowContent .flowHeader p{color:var(--flow-ui-canvasInk)}
+/* Limit backdrop blur to a few visible surfaces; long lists retain the static sheen. */
+@supports ((backdrop-filter:blur(8px)) or (-webkit-backdrop-filter:blur(8px))){.flowShell[data-flow-palette="white"]:not([data-flow-palette="original"]) :is(.actionCase,.nextChoices button,.intelHero,.actionDialog){background-color:#f6f8fc66;backdrop-filter:blur(8px) saturate(110%);-webkit-backdrop-filter:blur(8px) saturate(110%)}}
