@@ -36,6 +36,8 @@
 .flowShell[data-flow-palette]:not([data-flow-palette="original"]) :is(.brokerActions .pass,.dialogActions .danger){color:#9c3026;background:#fff0ed;border-color:#e2b3ad}
 
 /* Pastel Bloom: watercolor botanicals and eucalyptus controls on the existing lavender/blue canvas. */
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"])>.flowContent::before{opacity:.8}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"])>.flowContent::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#f4f1e9 0%,#e9ede266 15%,transparent 48%),linear-gradient(0deg,#f5ebddbd,transparent 38%)}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) .flowSidebar{background-image:url('/textures/pastel-botanical.jpg');background-size:100% 100%;background-position:center;background-repeat:no-repeat}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) .flowSidebar nav button{background:#faf8efe6}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.flowSidebar nav button.active,.flowSidebar nav button:hover){background:#dce5cf;color:#183d2a}
