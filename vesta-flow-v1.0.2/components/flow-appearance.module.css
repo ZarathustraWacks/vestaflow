@@ -6,3 +6,6 @@
 @media(max-width:380px){.dialog{padding:18px}.palettes{grid-template-columns:repeat(2,minmax(0,1fr))}.dialog footer{align-items:flex-start;flex-direction:column}.dialog footer>span{max-width:none}.dialog footer>div{align-self:flex-end}}
 @media(prefers-reduced-motion:reduce){.trigger,.palette{transition:none}.trigger:hover,.palette:hover{transform:none}}
 .control + :global(.flowMode){margin-top:0}
+:global(.flowShell[data-flow-palette="pastel"]) .trigger{background:#faf8eff2;border-color:#becbb6;color:#183d2a}
+:global(.flowShell[data-flow-palette="pastel"]) .trigger:not(:disabled):hover{background:#dce5cf}
+:global(.flowShell[data-flow-palette="pastel"]) .savedNotice{background:#faf8eff2;border-radius:5px;color:#31513e}
