@@ -6,6 +6,9 @@
 @media(max-width:380px){.dialog{padding:18px}.palettes{grid-template-columns:repeat(2,minmax(0,1fr))}.dialog footer{align-items:flex-start;flex-direction:column}.dialog footer>span{max-width:none}.dialog footer>div{align-self:flex-end}}
 @media(prefers-reduced-motion:reduce){.trigger,.palette{transition:none}.trigger:hover,.palette:hover{transform:none}}
 .control + :global(.flowMode){margin-top:0}
+:global(.flowShell[data-flow-palette="elm"]) .trigger{background:#faf5e8f2;color:#203d2d;border-color:#a8b69a}
+:global(.flowShell[data-flow-palette="elm"]) .trigger:not(:disabled):hover{background:#dde4cd}
+:global(.flowShell[data-flow-palette="elm"]) .savedNotice{background:#faf5e8f2;color:#3f5643;border-radius:5px}
 :global(.flowShell[data-flow-palette="coastal"]) .trigger{background:#e9f5eff2;color:#173f49;border-color:#8cbdb6;box-shadow:inset 0 1px 0 #ffffffb3}
 :global(.flowShell[data-flow-palette="coastal"]) .trigger:not(:disabled):hover{background:#c5e5dc}
 :global(.flowShell[data-flow-palette="coastal"]) .icon{color:#28616a}

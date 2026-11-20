@@ -54,6 +54,17 @@
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span){color:var(--flow-ui-ink)}
 
+/* Elm: Woodland Mist sidebar with the Silver Birch ivory/sage canvas and forest-green controls. */
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"])>.flowContent::before{opacity:.35}
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"])>.flowContent::after{content:"";position:absolute;inset:0 0 auto;height:760px;z-index:-1;pointer-events:none;background:url('/textures/elm-silver-birch-canvas.jpg') top right/cover no-repeat;mask-image:linear-gradient(#000 55%,transparent);-webkit-mask-image:linear-gradient(#000 55%,transparent)}
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) .flowSidebar{background-image:url('/textures/elm-woodland-mist.jpg');background-size:100% 100%;background-position:center;background-repeat:no-repeat}
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) :is(.flowBrand,.flowMode){background:#faf5e8f2;border-radius:11px}
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) .flowSidebar nav button{background:#faf5e8f2;color:#203d2d}
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) :is(.flowSidebar nav button.active,.flowSidebar nav button:hover){background:#dde4cd;color:#203d2d}
+.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) :is(.flowProgress button,.flowEmpty button){background:var(--flow-ui-accent);color:var(--flow-ui-onAccent);border-color:var(--flow-ui-accent)}
+@media(hover:hover){.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) :is(.brokerActions .complete,.dialogActions .primary,.resolveButton,.bulkActions button,.flowProgress button,.flowEmpty button):not(:disabled):hover{background:#294b38;border-color:#294b38}}
+@media(max-width:760px){.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) .flowSidebar{background-size:cover;background-position:center 35%}.flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"])>.flowContent::after{height:420px}}
+
 /* Coastal: original frosted sea glass, readable mint navigation and cream content surfaces. */
 .flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) .flowSidebar{background-image:url('/textures/coastal-seaglass.jpg');background-size:100% 100%;background-position:center;background-repeat:no-repeat}
 .flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.flowBrand,.flowMode){background:#e9f5eff2;border-radius:11px}
