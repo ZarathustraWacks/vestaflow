@@ -54,6 +54,21 @@
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span){color:var(--flow-ui-ink)}
 
+/* Coastal: original frosted sea glass, readable mint navigation and cream content surfaces. */
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) .flowSidebar{background-image:url('/textures/coastal-seaglass.jpg');background-size:100% 100%;background-position:center;background-repeat:no-repeat}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.flowBrand,.flowMode){background:#e9f5eff2;border-radius:11px}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) .flowSidebar nav button{background:#e9f5eff2;border:1px solid #ffffffa6;color:#173f49}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.flowSidebar nav button.active,.flowSidebar nav button:hover){background:#b8ddd3;color:#173f49}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.primaryAction,.passReason){background:var(--flow-ui-soft);color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span,.flowHeader p,.customerIntro>strong,.taskSummary,.actionDialog>span,.intelGrid article>span,.customerRow a,.taskRow a,.nextChoices span){color:#173f49}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.caseIdentity,.managementIdentity,.intelHero) h2 a{color:#173f49}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.brokerActions .complete,.dialogActions .primary,.resolveButton,.bulkActions button,.resolutionKinds button.active,.customerViews button.active,.flowFocus button.active,.flowProgress button,.flowEmpty button){background:linear-gradient(155deg,#d2ebe3,#a6d3c8);color:#173f49;border-color:#8cbdb6;box-shadow:inset 0 1px 0 #ffffffb3,0 2px 5px #173f4912}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.progressTrack span,.flowTimeline>div>span,.governanceCards i){background:#28616a}
+.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(button,a,input,select,textarea,summary):focus-visible{outline-color:#173f49}
+@media(hover:hover){.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) :is(.brokerActions .complete,.dialogActions .primary,.resolveButton,.bulkActions button,.flowProgress button,.flowEmpty button):not(:disabled):hover{background:linear-gradient(155deg,#c5e5dc,#96c7bd);border-color:#5c9690}}
+@media(max-width:760px){.flowShell[data-flow-palette="coastal"]:not([data-flow-palette="original"]) .flowSidebar{background-size:cover;background-position:center 40%}}
+
 /* Midnight: gunmetal marble sidebar, white cards and cool silver controls. */
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"])>.flowContent::before{opacity:.8}
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"])>.flowContent::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#a0a9ae 0%,#a0a9ae66 15%,transparent 48%),linear-gradient(0deg,#e4e7e8bd,transparent 38%)}
