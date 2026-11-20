@@ -34,3 +34,19 @@
 .flowShell[data-flow-palette]:not([data-flow-palette="original"]) :is(.brokerSelect,.flowFocus small,.flowProgress>div:first-child span){color:var(--flow-ui-canvasInk)}
 /* Keep destructive actions red even when ordinary action buttons use a palette accent. */
 .flowShell[data-flow-palette]:not([data-flow-palette="original"]) :is(.brokerActions .pass,.dialogActions .danger){color:#9c3026;background:#fff0ed;border-color:#e2b3ad}
+
+/* Pastel Bloom: existing lavender canvas, blue marble surfaces and dusty blue navigation. */
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.actionCase,.flowEmpty,.actionDialog,.bulkSchedule,.exceptionRail,.managementCase,.intelHero,.intelBody,.customerWorkspace,.taskWorkspace,.intelGrid article,.evidenceCards article,.governanceCards article,.nextChoices button){background-image:linear-gradient(124deg,transparent 0 31%,#9a9c9714 31.1%,transparent 31.5% 67%,#aaaca60f 67.1%,transparent 67.6%),linear-gradient(29deg,transparent 0 54%,#b8bab010 54.1%,transparent 54.5%),radial-gradient(ellipse at 20% 20%,#ffffff80,transparent 70%)}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction,.passReason){background-color:var(--flow-ui-soft);background-image:linear-gradient(132deg,transparent 0 36%,#8495a51a 36.1%,transparent 36.6% 75%,#a1b1c01a 75.1%,transparent 75.5%),radial-gradient(ellipse at 70% 10%,#ffffff30,transparent 72%);color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span){color:var(--flow-ui-ink)}
+
+/* Midnight: gunmetal marble sidebar, white cards and cool silver controls. */
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) .flowSidebar{background-image:linear-gradient(119deg,transparent 0 21%,#d4dee533 21.1%,#bcc9d51c 21.35%,transparent 21.9% 62%,#c9d5df29 62.1%,transparent 62.7%),linear-gradient(137deg,transparent 0 39%,#26333e40 39.1%,#9baeba24 39.4%,transparent 40.2% 84%,#b6c7d329 84.2%,transparent 84.8%),radial-gradient(ellipse at 5% 32%,#c2ced820,transparent 48%),radial-gradient(ellipse at 105% 76%,#26343f40,transparent 57%),linear-gradient(155deg,#ffffff08,transparent 50%,#202d361f);background-size:100% 680px,100% 940px,100% 100%,100% 100%,100% 100%}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.primaryAction,.passReason){background:var(--flow-ui-soft);color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span,.customerIntro>strong,.taskSummary,.actionDialog>span,.intelGrid article>span,.customerRow a,.taskRow a,.nextChoices span){color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.caseIdentity,.managementIdentity,.intelHero) h2 a{color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.progressTrack span,.flowTimeline>div>span,.governanceCards i){background:var(--flow-ui-sidebar)}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) .flowContent :is(button,a,input,select,textarea,summary):focus-visible{outline-color:var(--flow-ui-ink)}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) .flowContent .flowHeader p{color:var(--flow-ui-canvasInk)}
