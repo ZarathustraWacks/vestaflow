@@ -57,6 +57,8 @@
 /* Elm: Woodland Mist sidebar with the Silver Birch ivory/sage canvas and forest-green controls. */
 .flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"])>.flowContent::before{opacity:.35}
 .flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"])>.flowContent::after{content:"";position:absolute;inset:0 0 auto;height:760px;z-index:-1;pointer-events:none;background:url('/textures/elm-silver-birch-canvas.jpg') top right/cover no-repeat;mask-image:linear-gradient(#000 55%,transparent);-webkit-mask-image:linear-gradient(#000 55%,transparent)}
+.flowShell[data-flow-palette="elm"][data-flow-treatment="architectural"]>.flowContent::after{background-image:url('/textures/elm-architectural.jpg')}
+.flowShell[data-flow-palette="elm"][data-flow-treatment="botanical"]>.flowContent::after{background-image:linear-gradient(90deg,#f2f1e6ed,#f2f1e699 48%,#f2f1e64d),url('/textures/elm-botanical.jpg')}
 .flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) .flowSidebar{background-image:url('/textures/elm-woodland-mist.jpg');background-size:100% 100%;background-position:center;background-repeat:no-repeat}
 .flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) :is(.flowBrand,.flowMode){background:#faf5e8f2;border-radius:11px}
 .flowShell[data-flow-palette="elm"]:not([data-flow-palette="original"]) .flowSidebar nav button{background:#faf5e8f2;color:#203d2d}
