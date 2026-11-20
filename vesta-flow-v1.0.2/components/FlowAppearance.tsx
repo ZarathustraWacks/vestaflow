@@ -18,7 +18,8 @@ export default function FlowAppearance({brokerId}:{brokerId:number|null}){
   const shell=button.current?.closest<HTMLElement>('.flowShell');if(!shell)return;
   shell.dataset.flowPalette=choice.palette;shell.dataset.flowTreatment=choice.treatment;
   const palette=palettes.find(p=>p.id===choice.palette);['scene','pigment','light','deep'].forEach((token,index)=>{if(palette)shell.style.setProperty(`--flow-${token}`,palette.colors[index]);else shell.style.removeProperty(`--flow-${token}`);});
-  return()=>{delete shell.dataset.flowPalette;delete shell.dataset.flowTreatment;['scene','pigment','light','deep'].forEach(token=>shell.style.removeProperty(`--flow-${token}`));};
+  const uiTokens=Object.keys(palettes[0].ui);uiTokens.forEach(token=>{if(palette)shell.style.setProperty(`--flow-ui-${token}`,palette.ui[token as keyof typeof palette.ui]);else shell.style.removeProperty(`--flow-ui-${token}`);});
+  return()=>{delete shell.dataset.flowPalette;delete shell.dataset.flowTreatment;['scene','pigment','light','deep'].forEach(token=>shell.style.removeProperty(`--flow-${token}`));uiTokens.forEach(token=>shell.style.removeProperty(`--flow-ui-${token}`));};
  },[choice.palette,choice.treatment]);
  useEffect(()=>{
   if(!key)return;const sync=(event:StorageEvent)=>{if(event.key!==key)return;if(dialog.current?.open){setError('Your saved background changed in another tab. Save choice to keep this preview, or cancel to use the latest saved choice.');return;}const saved=parseAppearance(event.newValue);setState({key,saved,preview:saved});};
@@ -33,9 +34,9 @@ export default function FlowAppearance({brokerId}:{brokerId:number|null}){
   <span className={styles.savedNotice} role="status">{notice}</span>
   <dialog ref={dialog} id="flow-appearance-dialog" className={styles.dialog} aria-labelledby="flow-appearance-heading" onCancel={event=>{event.preventDefault();close();}} onClick={event=>{if(event.target===dialog.current){const rect=dialog.current.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();}}}>
    <header><div><small>MAKE FLOW YOURS</small><h2 id="flow-appearance-heading">Choose your background</h2></div><button type="button" onClick={close} className={styles.close} aria-label="Cancel background changes">×</button></header>
-   <p>Preview a palette and finish. Your cards and work stay the same.</p>
+   <p>Preview coordinated backgrounds, cards and highlights. Your layout and work stay the same.</p>
    <div className={styles.palettes} role="group" aria-label="Background palette">
-    {palettes.map(p=><button type="button" key={p.id} className={styles.palette} aria-pressed={choice.palette===p.id} onClick={()=>preview({palette:p.id})}><span className={`${styles.swatch} ${styles[choice.treatment]}`} style={{'--swatch-scene':p.colors[0],'--swatch-pigment':p.colors[1],'--swatch-light':p.colors[2]} as CSSProperties} aria-hidden="true"><i/><i/><i/></span><span>{p.name}</span>{choice.palette===p.id&&<b aria-hidden="true">✓</b>}</button>)}
+    {palettes.map(p=><button type="button" key={p.id} className={styles.palette} aria-pressed={choice.palette===p.id} onClick={()=>preview({palette:p.id})}><span className={`${styles.swatch} ${styles[choice.treatment]}`} style={{'--swatch-scene':p.colors[0],'--swatch-pigment':p.colors[1],'--swatch-light':p.colors[2],'--swatch-card':p.ui.surface,'--swatch-accent':p.ui.accent,'--swatch-sidebar':p.ui.sidebar} as CSSProperties} aria-hidden="true"><i/><i/><i/></span><span>{p.name}</span>{choice.palette===p.id&&<b aria-hidden="true">✓</b>}</button>)}
    </div>
    <h3>Background finish</h3><div className={styles.finishes} role="group" aria-label="Background finish">{treatments.map(t=><button type="button" key={t} disabled={choice.palette==='original'} aria-pressed={choice.palette!=='original'&&choice.treatment===t} onClick={()=>preview({treatment:t})}>{title(t)}</button>)}</div>
    <button type="button" className={styles.original} aria-pressed={choice.palette==='original'} onClick={()=>preview(originalAppearance)}>Use original Flow background</button>
