@@ -1,3 +1,4 @@
+import {smartListAttention} from '@/lib/policy/smart-list-opportunities';
 import {flowRelationshipSignals,completionStillHeld,needsBuyerContact} from './relationships';
 import {isOperationalLead} from '@/lib/operational-eligibility';
 import type { FlowEvent,FlowItem,ManagementException } from './types';
@@ -28,11 +29,12 @@ function priorityScore(lead:any,relationship=flowRelationshipSignals(lead)){
  const appointmentAt=lead.nextAppointmentAt?Date.parse(lead.nextAppointmentAt):NaN;
  const appointmentMomentum=Number.isFinite(appointmentAt)&&appointmentAt>=Date.now()&&appointmentAt-Date.now()<=48*3600000?80:0;
  const recentEffort=Number(lead.evidenceSummary?.behavior?.windows?.['7']?.calls||0)+Number(lead.evidenceSummary?.behavior?.windows?.['7']?.texts||0)>0?15:0;
- return (relationship.needsContactNow?1000:0)+(relationship.important?60:0)+urgency+risk+sla+cadence+confirmation+(100-Number(lead.governanceScore||0))+activeMomentum+appointmentMomentum+recentEffort;
+ return (relationship.needsContactNow?1000:0)+(relationship.important?60:0)+urgency+risk+sla+cadence+confirmation+(100-Number(lead.governanceScore||0))+activeMomentum+appointmentMomentum+recentEffort+smartListAttention(lead).points;
 }
 
-function actionable(lead:any,now=Date.now(),relationship=flowRelationshipSignals(lead,now)){
+function actionable(lead:any,now=Date.now(),relationship=flowRelationshipSignals(lead,now),includeSmartList=true){
  if(!relationship.queueEligible)return false;
+ if(includeSmartList&&smartListAttention(lead,now).available)return true;
  if(relationship.pastClient&&(relationship.dueTask||relationship.recentRequest||relationship.appointmentDue))return true;
  if(lead.contextConflict||relationship.needsContactNow||relationship.needsCadencePlan||relationship.cadenceConflict||relationship.importantPlan)return true;
  if(lead.decision?.urgency&&lead.decision.urgency!=='Monitor')return true;
@@ -71,10 +73,11 @@ export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|nu
  for(const lead of leads.filter(isOperationalLead)){
  const history=leadEvents(events,String(lead.id)),owner=latestOwnership(lead,history),relationship=flowRelationshipSignals(lead);
   if(owner.id!==brokerId||suppressed(lead,history)||!actionable(lead,Date.now(),relationship))continue;
-  const score=priorityScore(lead,relationship),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
+  const attention=smartListAttention(lead),signalOnly=attention.available&&!actionable(lead,Date.now(),relationship,false),score=priorityScore(lead,relationship),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
   const recommendation=lead.contextConflict?lead.decision?.label||'Review the recorded disposition':relationship.needsContactNow?'Contact buyer - contact not yet established':relationship.cadenceConflict?'Confirm one nurture cadence':relationship.needsCadencePlan?'Plan nurture follow-up':relationship.importantPlan?'Plan an Important contact follow-up':null;
-  items.push({relationship,id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:lead.contextConflict?'Today':relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:recommendation||lead.decision?.label||lead.recommendedAction,rationale:lead.contextConflict?lead.decision.rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
+  items.push({relationship,id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:lead.contextConflict?'Today':relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:signalOnly?'Review Smart List opportunity':recommendation||lead.decision?.label||lead.recommendedAction,rationale:lead.contextConflict?lead.decision.rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
  }
+ for(const item of items){const attention=smartListAttention(item.lead);if(attention.available)item.rationale=[item.rationale,attention.reason].filter(Boolean).join(' ');}
  return items.sort((a,b)=>b.priorityScore-a.priorityScore||a.lead.governanceScore-b.lead.governanceScore).map((item,index)=>({...item,position:index+1}));
 }
 
