@@ -55,6 +55,8 @@
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction>span,.passReason>span){color:var(--flow-ui-ink)}
 
 /* Midnight: gunmetal marble sidebar, white cards and cool silver controls. */
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"])>.flowContent::before{opacity:.8}
+.flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"])>.flowContent::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#a0a9ae 0%,#a0a9ae66 15%,transparent 48%),linear-gradient(0deg,#e4e7e8bd,transparent 38%)}
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) .flowSidebar{background-image:linear-gradient(119deg,transparent 0 21%,#d4dee533 21.1%,#bcc9d51c 21.35%,transparent 21.9% 62%,#c9d5df29 62.1%,transparent 62.7%),linear-gradient(137deg,transparent 0 39%,#26333e40 39.1%,#9baeba24 39.4%,transparent 40.2% 84%,#b6c7d329 84.2%,transparent 84.8%),radial-gradient(ellipse at 5% 32%,#c2ced820,transparent 48%),radial-gradient(ellipse at 105% 76%,#26343f40,transparent 57%),linear-gradient(155deg,#ffffff08,transparent 50%,#202d361f);background-size:100% 680px,100% 940px,100% 100%,100% 100%,100% 100%}
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.primaryAction,.passReason){background:var(--flow-ui-soft);color:var(--flow-ui-ink)}
 .flowShell[data-flow-palette="midnight"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
