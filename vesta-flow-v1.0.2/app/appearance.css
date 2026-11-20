@@ -35,7 +35,18 @@
 /* Keep destructive actions red even when ordinary action buttons use a palette accent. */
 .flowShell[data-flow-palette]:not([data-flow-palette="original"]) :is(.brokerActions .pass,.dialogActions .danger){color:#9c3026;background:#fff0ed;border-color:#e2b3ad}
 
-/* Pastel Bloom: existing lavender canvas, blue marble surfaces and dusty blue navigation. */
+/* Pastel Bloom: watercolor botanicals and eucalyptus controls on the existing lavender/blue canvas. */
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) .flowSidebar{background-image:url('/textures/pastel-botanical.jpg');background-size:100% 100%;background-position:center;background-repeat:no-repeat}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) .flowSidebar nav button{background:#faf8efe6}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.flowSidebar nav button.active,.flowSidebar nav button:hover){background:#dce5cf;color:#183d2a}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) .flowMode{background:#faf8eff2;border-radius:10px}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.flowProgress button,.flowEmpty button){background:var(--flow-ui-accent);color:var(--flow-ui-onAccent);border-color:var(--flow-ui-accent)}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.brokerActions button,.dialogActions button,.resolutionKinds button,.customerViews button,.flowFocus button,.customerBulkBar button,.returnPresets button,.intelBack){border-color:#aebfa9}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.brokerActions .complete,.dialogActions .primary,.resolveButton,.bulkActions button,.resolutionKinds button.active,.customerViews button.active,.flowFocus button.active){border-color:var(--flow-ui-accent)}
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) .flowSidebar nav button:focus-visible{outline-color:#183d2a}
+@media(hover:hover){.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.brokerActions .complete,.dialogActions .primary,.resolveButton,.bulkActions button,.flowProgress button,.flowEmpty button):not(:disabled):hover{background:#365543;border-color:#365543}.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.brokerActions button:not(.complete):not(.pass),.customerViews button:not(.active),.flowFocus button:not(.active),.intelBack):not(:disabled):hover{background:#edf2e7;border-color:#728b73}}
+/* Destructive states remain distinct from ordinary eucalyptus actions. */
+.flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.brokerActions .pass,.dialogActions .danger){border-color:#e2b3ad}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.actionCase,.flowEmpty,.actionDialog,.bulkSchedule,.exceptionRail,.managementCase,.intelHero,.intelBody,.customerWorkspace,.taskWorkspace,.intelGrid article,.evidenceCards article,.governanceCards article,.nextChoices button){background-image:linear-gradient(124deg,transparent 0 31%,#9a9c9714 31.1%,transparent 31.5% 67%,#aaaca60f 67.1%,transparent 67.6%),linear-gradient(29deg,transparent 0 54%,#b8bab010 54.1%,transparent 54.5%),radial-gradient(ellipse at 20% 20%,#ffffff80,transparent 70%)}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction,.passReason){background-color:var(--flow-ui-soft);background-image:linear-gradient(132deg,transparent 0 36%,#8495a51a 36.1%,transparent 36.6% 75%,#a1b1c01a 75.1%,transparent 75.5%),radial-gradient(ellipse at 70% 10%,#ffffff30,transparent 72%);color:var(--flow-ui-ink)}
 .flowShell[data-flow-palette="pastel"]:not([data-flow-palette="original"]) :is(.primaryAction p,.primaryAction small,.passReason p,.passReason small){color:var(--flow-ui-muted)}
