@@ -34,7 +34,7 @@ export function reconcileActionReceipts(data:any,receipts:Iterable<ActionReceipt
   // The customer projection includes clock inputs, so a real new hand raise
   // can reopen work. Never manufacture a FUB communication timestamp.
   const hide=held.get(String(customer.id))??flowActionSuppressed({...receipt.lead,...customer},[receipt.event]);
-  return {...customer,flowActionHeld:hide,flowAction:{id:receipt.event.id,kind:receipt.event.kind,createdAt:receipt.event.createdAt}};
+  return {...customer,flowActionHeld:hide,flowActionReceipt:receipt.event,flowAction:{id:receipt.event.id,kind:receipt.event.kind,createdAt:receipt.event.createdAt}};
  });
  return {...data,queue,total:queue.length,customers};
 }

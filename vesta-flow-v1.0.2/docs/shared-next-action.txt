@@ -1,0 +1,25 @@
+SHARED NEXT-ACTION LAYER — SHADOW BUILD
+
+Purpose
+A customer attempt, actual connection, appointment and transaction are different objectives. The shared planner turns saved evidence into one proposed obligation with objective, due basis, completion criteria, outcome transitions and red rule conflicts. It does not change priority, first-contact timing, completion suppression, assignment, communication counting or sending.
+
+Canonical source
+Cadence lib/next-action/engine.ts and policy.json are canonical. Flow consumes identical pinned copies. contract.json fingerprints the policy, engine and shared UI; each app tests those fingerprints. Run scripts/export-next-action.mjs --check FLOW_APP to verify parity, or --write FLOW_APP after reviewing a canonical change. Both applications must be reviewed and released together when this contract changes. Same evidence and policy produce the same proposal; different/older mirrors can still disagree and are shown for review.
+
+SOP update from Grig and Brad
+Keep this baseline version: next-action-shadow-2026-11-20-v1. Create a new policy version when the new SOP arrives, update evidence fixtures and both consumer exports, and compare the two versions before activation. Do not silently fill later-attempt spacing, a reactivation SLA, connection working-hours target or reroute/pause thresholds. They are intentionally unset. Current guidance retained: 10 individual calls, double-tap structure and 15 minutes before the second double tap. Exact verified current-owner calls and explicit working-hours context are required before the planner calculates that interval. No API collector or new time window has been enabled by this change.
+
+Safety and evidence
+No-contact restrictions and inactive/recruiting stages precede outreach. Historical rental labels plus renewed intent become classification review, not automatic buyer conversion or exclusion. Original source and incoming time remain intact. Outbound activity, generic last communication, call duration and an old conversation do not prove a new connection. A source two-way timestamp and a broker-reported conversation retain different provenance. Verified note delivery proves receipt, not conversation truth. Explicit skips/holds, customer timing, appointment and contract states are respected. An overdue connection review requires an existing approved clock; the preview never invents a new SLA or automatic reroute. The shadow planner can flag a weekly completion hold that conflicts with an unresolved connection objective while leaving the live hold intact.
+
+Access and deployment
+NEXT_PUBLIC_VESTA_NEXT_ACTION_PREVIEW=true is the only display opt-in; unset defaults off. In Flow: My action flow -> Review proposed next actions; selected lead also shows the proposed action. In Cadence: Reports -> Next-action comparison; lead workspace has the same panel. The comparison uses already loaded saved data, renders at most 100 contacts per page and defaults to rule conflicts. It is not a complete new event collection or a new orchestration service. FUB records remain the operational source; no task, message, stage or reassignment is written.
+
+Recovery snapshot
+Before implementation, source archives and SHA256 checksums were saved in the workspace snapshots/pre-next-action-2026-11-20. Baselines: Flow df48d834acfb3007cd46c16a24793860256d5e1b; Cadence 8822b35248c906480984973b40cf1986abb26556; shared Source last verified d2ea2f90eb4ebf6ea8062a01d8ffca11fa80250d (reference only, not changed). These are committed-code and policy snapshots, not database backups. This release needs no database rollback because it rewrites no customer or event rows. Disable the preview flag or restore the original app commit independently. Do not deploy the older Source main branch over its current live baseline.
+
+Validation
+Shared scenarios cover the Margaret-shaped rental conflict, weekly-hold discrepancy, unanswered calls, old and inbound-only history, explicit conversation reports, original incoming preservation, exact call deduplication and limits, working-hours uncertainty, customer timing, appointment/contract transitions and version parity. Browser QA uses synthetic saved records and never completes or edits a real contact.
+
+FINAL CHECKS
+Flow 221 tests and production build passed. Cadence 319 tests, source hygiene, typecheck and production build passed. Shared export parity check passed. A synthetic 30,000-record planner pass took about 57 ms locally (not an end-to-end page benchmark); rendered comparison pages are limited to 100 contacts. The recovery archives were verified against their saved SHA256 hashes. No production activation or database writes were used for validation.
