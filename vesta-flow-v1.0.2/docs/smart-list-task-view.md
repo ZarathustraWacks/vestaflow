@@ -1,0 +1,11 @@
+# Smart Lists in My tasks
+
+My Task View remains the default whenever the sidebar's My tasks button is opened. FUB Smartlist View shows a read-only spreadsheet with one row per matched current-owner contact and multiple list names together. Columns show contact/FUB link, Smart List, stage, latest recorded activity, last broker outreach, next open task/due and Flow recommendation. Search, list/stage/activity/overdue filters and sortable headings operate locally, with at most 100 contact rows per page.
+
+The existing authenticated Flow response joins saved Render signals to the existing contact/task spine. No additional collector, key, vendor scan or write path is added. Membership uses the existing owner-key collector, and the display rejects mismatched owners, conflicting identity, expired/future signals and non-advisory contracts. A membership check date is never substituted for a communication date. This view includes the connected mapped lists and matched contacts exposed by the existing feed; it is not a complete catalog of every FUB Smart List. Partial/unavailable snapshots are labeled explicitly.
+
+Expanding a contact reads its latest available timeline through Flow's existing authenticated contact-detail endpoint. It reads only on expansion, caches successful results for that mounted view, and offers retry on failure. Latest 10 available timeline events and existing open tasks appear below the contact. A missing/partial source never becomes proof of no contact. Merely displaying a membership makes no task, completion, communication or cadence change.
+
+While this tab is active, the existing background queue refresh also refreshes saved memberships. It does not force a selected-contact FUB refresh. Existing broker authorization and immediate confirmed-action receipts remain in place. No Render deployment is required.
+
+Validation: 205 tests passed, including owner isolation, identity conflicts, membership deduplication, stale/future rejection, combined filters, missing timestamp sorting and preservation of communication clocks. Synthetic Safari checks verified default tab, compact table, sorting, 205 total contacts, 100-row pages, a 105-contact list with 5 on page 2, search returning page 1, expanded activity/tasks and FUB links. No production data was edited. Temporary fixture removed before commit.
