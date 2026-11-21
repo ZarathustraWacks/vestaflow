@@ -4,6 +4,12 @@ import {isOperationalLead} from '@/lib/operational-eligibility';
 import type { FlowEvent,FlowItem,ManagementException } from './types';
 
 const leadEvents=(events:FlowEvent[],leadId:string)=>events.filter(event=>event.leadId===leadId).sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+export function flowEventIndex(events:FlowEvent[]){
+ const index=new Map<string,FlowEvent[]>();
+ for(const event of events){const id=String(event.leadId),history=index.get(id)||[];history.push(event);index.set(id,history);}
+ for(const history of index.values())history.sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));
+ return index;
+}
 const resolutionKinds=new Set(['management.reroute','management.return','management.nurture','management.kill']);
 
 function latestOwnership(lead:any,events:FlowEvent[]){
@@ -49,7 +55,7 @@ function unresolvedPass(events:FlowEvent[]){
  return resolved?null:pass;
 }
 
-function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
+export function flowActionSuppressed(lead:any,events:FlowEvent[],now=Date.now()){
  const kill=events.find(event=>event.kind==='management.kill');if(kill)return true;
  const pass=unresolvedPass(events);if(pass)return true;
  const nurture=events.find(event=>event.kind==='management.nurture');if(nurture&&(!nurture.returnAt||new Date(nurture.returnAt).getTime()>now))return true;
@@ -69,10 +75,10 @@ function suppressed(lead:any,events:FlowEvent[],now=Date.now()){
 }
 
 export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|null):FlowItem[]{
- const items:FlowItem[]=[];
+ const items:FlowItem[]=[],histories=flowEventIndex(events);
  for(const lead of leads.filter(isOperationalLead)){
- const history=leadEvents(events,String(lead.id)),owner=latestOwnership(lead,history),relationship=flowRelationshipSignals(lead);
-  if(owner.id!==brokerId||suppressed(lead,history)||!actionable(lead,Date.now(),relationship))continue;
+ const history=histories.get(String(lead.id))||[],owner=latestOwnership(lead,history),relationship=flowRelationshipSignals(lead);
+  if(owner.id!==brokerId||flowActionSuppressed(lead,history)||!actionable(lead,Date.now(),relationship))continue;
   const attention=smartListAttention(lead),signalOnly=attention.available&&!actionable(lead,Date.now(),relationship,false),score=priorityScore(lead,relationship),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
   const recommendation=lead.contextConflict?lead.decision?.label||'Review the recorded disposition':relationship.needsContactNow?'Contact buyer - contact not yet established':relationship.cadenceConflict?'Confirm one nurture cadence':relationship.needsCadencePlan?'Plan nurture follow-up':relationship.importantPlan?'Plan an Important contact follow-up':null;
   items.push({relationship,id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:lead.contextConflict?'Today':relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:signalOnly?'Review Smart List opportunity':recommendation||lead.decision?.label||lead.recommendedAction,rationale:lead.contextConflict?lead.decision.rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
