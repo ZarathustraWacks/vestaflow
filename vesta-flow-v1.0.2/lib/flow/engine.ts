@@ -63,7 +63,7 @@ export function flowActionSuppressed(lead:any,events:FlowEvent[],now=Date.now())
  const latest=events[0];
  if(operationalNextActionsEnabled()){
   const action=currentNextAction(lead,events,now);
-  if(action.plan.state==='excluded'||action.held)return true;
+  if(action.plan.state==='excluded'||action.admitted&&action.held)return true;
   if(latest?.kind==='broker.skip'&&latest.returnAt&&Date.parse(latest.returnAt)>now)return true;
   if(action.eligible&&(action.episode.openedAt||(latest?.metadata?.nextAction as any)?.contractVersion===NEXT_ACTION_RECEIPT))return false;
  }
