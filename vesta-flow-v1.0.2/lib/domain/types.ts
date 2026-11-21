@@ -11,6 +11,7 @@ export interface GovernanceSignal { key:string; label:string; status:'pass'|'war
 export interface LeadDecision { type:string; label:string; urgency:'Immediate'|'Today'|'This week'|'Monitor'; rationale:string; consequence:string; matchedRule:string; evidenceQuality:'High'|'Medium'|'Low'; dataCompleteness:number; }
 export interface OperationalClock {key:'route-acceptance'|'initial-acknowledgement'|'first-contact-attempt'|'meaningful-contact'|'appointment-confirmation'|'ongoing-cadence';label:string;status:'met'|'pending'|'breached'|'unknown'|'not-applicable';dueAt:string|null;clearedAt:string|null;clearingAction:string;policyStatus:'approved'|'proposed'|'ambiguous';}
 export interface NormalizedLead {
+ doNotContact?:boolean;doNotCall?:boolean;nextActionEvidence?:any; nextAction?:any; legacyDecision?:any;
  cadenceStage?:string;crmStage?:string;contactContext?:any;documentedContactAt?:string|null;integrationCommunicationAt?:string|null;contextConflict?:boolean;
   id:number|string; name:string; stage:string; source:string; businessSegment:'buyer-seller'|'rental'|'needs-classification'; businessSegmentReason:string; businessSegmentEvidence?:string[];
   leadLane:LeadLane; timeframeId:number|null; timeframeStatus:string|null;

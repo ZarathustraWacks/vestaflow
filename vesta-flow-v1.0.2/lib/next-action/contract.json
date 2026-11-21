@@ -2,11 +2,13 @@
   "canonicalRepository": "ZarathustraWacks/cadence-report",
   "canonicalRoot": "vesta-manager-11.3.0-github-ready",
   "contractVersion": "vesta-next-obligation-v1",
-  "policyVersion": "next-action-shadow-2026-11-20-v1",
+  "policyVersion": "next-action-operational-2026-11-21-v2",
   "files": {
-    "lib/next-action/engine.ts": "e133d847d41d7dc02aed24e3b84a4e7b5f2fe3ecbc4f9d96b70f79b6dd748f72",
-    "lib/next-action/policy.json": "90946c8e1ccd4f7e072ea557166515be1f09c53158a64dd0e4543cdd1b7dd349",
-    "components/NextActionPreview.tsx": "cd4f8ece2f88e8f0f3913e0f865c60325bfd200d5ac365d904c48f7e2564d7eb",
+    "lib/next-action/engine.ts": "f424be4461d071b77532f9f90f7abf7006f7a0a956c3e960bdbb3974f99d8903",
+    "lib/next-action/policy.json": "a49dd46dcd76d4f2efc4893be4e90f753fa0737cd019ba94820c0675d71fb178",
+    "lib/next-action/operational.ts": "72a4d32dfab7880b01b7beec1717946349dae8f096ae5c2b5fc4b202f8b73d68",
+    "lib/next-action/evidence.ts": "86b805a91b87ce155daf382b382ed7ff61e56ba5f4727211a1e67c9f64147bf5",
+    "components/NextActionPreview.tsx": "64a1f049364953004eca62e2b1e87198eaace7d5b83b7465fd08b72cfdff050e",
     "components/NextActionPreview.module.css": "b5aa14d1a4858c2720a07651bafec0958b464f86ef0ee366f4e8c0dd8e529f5c"
   }
 }

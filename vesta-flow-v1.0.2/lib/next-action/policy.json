@@ -1,6 +1,6 @@
 {
-  "version": "next-action-shadow-2026-11-20-v1",
-  "status": "review-before-activation",
+  "version": "next-action-operational-2026-11-21-v2",
+  "status": "activation-candidate",
   "activationLookbackDays": 7,
   "callsPerDoubleTap": 2,
   "initialDoubleTapGapMinutes": 15,
@@ -8,5 +8,11 @@
   "laterAttemptSpacingMinutes": null,
   "reactivationSlaMinutes": null,
   "automaticReroute": false,
-  "pendingReview": ["Grig and Brad cadence update", "Later attempt spacing", "Reactivation response SLA", "Working-hours connection target", "Manager pause and reroute thresholds"]
+  "pendingReview": [
+    "Grig and Brad cadence update",
+    "Later attempt spacing",
+    "Reactivation response SLA",
+    "Working-hours connection target",
+    "Manager pause and reroute thresholds"
+  ]
 }

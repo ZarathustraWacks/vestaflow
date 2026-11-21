@@ -1,3 +1,4 @@
+import {applyOperationalNextAction,currentNextAction,operationalNextActionsEnabled,NEXT_ACTION_RECEIPT} from '@/lib/next-action/operational';
 import {smartListAttention} from '@/lib/policy/smart-list-opportunities';
 import {flowRelationshipSignals,completionStillHeld,needsBuyerContact} from './relationships';
 import {isOperationalLead} from '@/lib/operational-eligibility';
@@ -59,7 +60,14 @@ export function flowActionSuppressed(lead:any,events:FlowEvent[],now=Date.now())
  const kill=events.find(event=>event.kind==='management.kill');if(kill)return true;
  const pass=unresolvedPass(events);if(pass)return true;
  const nurture=events.find(event=>event.kind==='management.nurture');if(nurture&&(!nurture.returnAt||new Date(nurture.returnAt).getTime()>now))return true;
- const latest=events[0];if(!latest)return false;
+ const latest=events[0];
+ if(operationalNextActionsEnabled()){
+  const action=currentNextAction(lead,events,now);
+  if(action.plan.state==='excluded'||action.held)return true;
+  if(latest?.kind==='broker.skip'&&latest.returnAt&&Date.parse(latest.returnAt)>now)return true;
+  if(action.eligible&&(action.episode.openedAt||(latest?.metadata?.nextAction as any)?.contractVersion===NEXT_ACTION_RECEIPT))return false;
+ }
+ if(!latest)return false;
  if(latest.kind==='broker.complete'&&needsBuyerContact(lead)&&['Follow-up task created','Follow-up scheduled','Appointment confirmed'].includes(latest.outcome||''))return false;
  const relationship=flowRelationshipSignals(lead,now);
  if(relationship.pastClient&&relationship.dueTask&&latest.kind==='broker.complete')return false;
@@ -76,12 +84,13 @@ export function flowActionSuppressed(lead:any,events:FlowEvent[],now=Date.now())
 
 export function buildFlowQueue(leads:any[],events:FlowEvent[],brokerId:number|null):FlowItem[]{
  const items:FlowItem[]=[],histories=flowEventIndex(events);
- for(const lead of leads.filter(isOperationalLead)){
- const history=histories.get(String(lead.id))||[],owner=latestOwnership(lead,history),relationship=flowRelationshipSignals(lead);
-  if(owner.id!==brokerId||flowActionSuppressed(lead,history)||!actionable(lead,Date.now(),relationship))continue;
+ for(const originalLead of leads.filter(isOperationalLead)){
+ const history=histories.get(String(originalLead.id))||[],lead=operationalNextActionsEnabled()?applyOperationalNextAction(originalLead,history):originalLead,owner=latestOwnership(lead,history),relationship=flowRelationshipSignals(lead);
+ const supported=lead.nextAction?.eligible&&(lead.nextAction.episode.openedAt||history.some(e=>(e.metadata?.nextAction as any)?.contractVersion===NEXT_ACTION_RECEIPT));
+  if(owner.id!==brokerId||flowActionSuppressed(lead,history)||!supported&&!actionable(lead,Date.now(),relationship))continue;
   const attention=smartListAttention(lead),signalOnly=attention.available&&!actionable(lead,Date.now(),relationship,false),score=priorityScore(lead,relationship),skipCount=history.filter(event=>event.kind==='broker.skip'&&event.decisionSnapshotId===lead.decisionSnapshotId).length;
-  const recommendation=lead.contextConflict?lead.decision?.label||'Review the recorded disposition':relationship.needsContactNow?'Contact buyer - contact not yet established':relationship.cadenceConflict?'Confirm one nurture cadence':relationship.needsCadencePlan?'Plan nurture follow-up':relationship.importantPlan?'Plan an Important contact follow-up':null;
-  items.push({relationship,id:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:lead.contextConflict?'Today':relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:signalOnly?'Review Smart List opportunity':recommendation||lead.decision?.label||lead.recommendedAction,rationale:lead.contextConflict?lead.decision.rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
+  const recommendation=supported?lead.nextAction.plan.label:lead.contextConflict?lead.decision?.label||'Review the recorded disposition':relationship.needsContactNow?'Contact buyer - contact not yet established':relationship.cadenceConflict?'Confirm one nurture cadence':relationship.needsCadencePlan?'Plan nurture follow-up':relationship.importantPlan?'Plan an Important contact follow-up':null;
+  items.push({relationship,id:supported?lead.nextAction.actionId:`${lead.id}:${lead.decisionSnapshotId}`,leadId:String(lead.id),lead,effectiveOwnerId:owner.id,effectiveOwnerName:owner.name,priorityScore:score,priorityLabel:supported?lead.decision.urgency:lead.contextConflict?'Today':relationship.needsContactNow?'Immediate':recommendation?'Today':lead.decision?.urgency||'Monitor',recommendedAction:signalOnly?'Review Smart List opportunity':recommendation||lead.decision?.label||lead.recommendedAction,rationale:supported?lead.nextAction.plan.reason:lead.contextConflict?lead.decision.rationale:recommendation?(relationship.needsContactNow?'No successful contact is established. An outreach attempt still clears its own response timer; subsequent attempts follow the approved cadence.':relationship.needsCadencePlan||relationship.cadenceConflict?'Confirm the intended cadence or schedule a follow-up. Flow does not assign a weekly or monthly tag automatically.':'The Important tag identifies a relationship to plan and prioritize.'):lead.decision?.rationale||lead.recommendedAction,consequence:lead.decision?.consequence||'The opportunity may continue aging.',skipCount,lastEvent:history[0]||null});
  }
  for(const item of items){const attention=smartListAttention(item.lead);if(attention.available)item.rationale=[item.rationale,attention.reason].filter(Boolean).join(' ');}
  return items.sort((a,b)=>b.priorityScore-a.priorityScore||a.lead.governanceScore-b.lead.governanceScore).map((item,index)=>({...item,position:index+1}));
