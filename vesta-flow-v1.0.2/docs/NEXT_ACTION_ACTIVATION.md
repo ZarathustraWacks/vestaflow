@@ -10,7 +10,7 @@ This release makes the shared next-action model operational for recent incoming/
 - A reported connected conversation changes the objective to the appointment obstacle/next step. Agreed timing, contact restrictions, manager holds and passes remain in force.
 - Original incoming and first-call clocks are unchanged. Office reporting hours do not silently defer an actively working broker to another day.
 - Flow advances a confirmed result immediately. A durable fenced claim freezes the submission before sending; ambiguous results allow only read-only recovery, preventing a second send. Source ledger events remain immutable and scoped by owner/contact/obligation.
-- Cadence reads minimal saved receipts from the existing shared Source service in complete background pages. It does not read from the Flow Blueprint, issue FUB calls for this feed, or automatically reassign leads. Prepared reroute rules and their compiler revision remain unchanged.
+- Cadence reads minimal saved receipts from the existing shared Source service in complete background pages. It does not read from the Flow Blueprint, issue FUB calls for this feed, or automatically reassign leads. Eligible renewed inquiries enter the presentation priority queue even when their old risk rating is healthy. Prepared reroute rules and their compiler revision remain unchanged.
 
 ## Activation order
 
@@ -30,4 +30,4 @@ Disable the operational app flags to stop the new queue interpretation, or redep
 
 ## Validation
 
-Flow: 240 tests; Cadence: 333 tests; Source ledger/transport: 17; Source evidence/publication: 6 plus 42 existing regression checks; Flow accelerator: 33. Production builds and synthetic Safari queue/form/advancement checks passed. Production changes and real FUB writes were not performed during preparation.
+Flow: 240 tests; Cadence: 334 tests; Source ledger/transport: 17; Source evidence/publication: 6 plus 42 existing regression checks; Flow accelerator: 33. Production builds and synthetic Safari queue/form/advancement checks passed. Production changes and real FUB writes were not performed during preparation.
