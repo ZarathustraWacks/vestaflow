@@ -9,5 +9,5 @@ export function dailyGoal(events:FlowEvent[],brokerId:number,timeZone:string,now
   if(live&&(!sync?.delivered||sync.simulated))continue;
   seen.add(event.id);
  }
- return {completed:seen.size,target:20,day,timeZone};
+ return {completed:seen.size,eventIds:[...seen],target:20,day,timeZone};
 }

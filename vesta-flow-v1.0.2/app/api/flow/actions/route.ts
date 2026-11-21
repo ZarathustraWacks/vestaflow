@@ -1,9 +1,10 @@
+import {listFlowQueueEvents} from '@/lib/flow/queue-history';
 import {enqueueFlowContactRefresh} from '@/lib/render/flow-accelerator';
 import { randomUUID } from 'node:crypto';
 import { after,NextRequest,NextResponse } from 'next/server';
 import { getFlowSpine } from '@/lib/fub/service';
 import { discoverBrokers } from '@/lib/flow/brokers';
-import { appendFlowEvent,flowStorageStatus,listFlowEvents } from '@/lib/flow/store';
+import { appendFlowEvent,flowStorageStatus } from '@/lib/flow/store';
 import { sendManagementAlert } from '@/lib/flow/alerts';
 import type { BrokerActionKind,FlowEvent } from '@/lib/flow/types';
 import { syncCompletionToFub } from '@/lib/fub/writeback';
@@ -23,7 +24,7 @@ export async function POST(request:NextRequest){
   const spine=await getFlowSpine({ownUserId:ownId,manager,brokerId:requestedBroker});
   const brokers=discoverBrokers(spine.people.items,spine.users.items);
   let events:FlowEvent[];
-  try{events=await listFlowEvents()}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'The live intelligence spine is connected, but action storage is unavailable. No action was recorded. Check the Render ledger connection and migration readiness in Vercel.'},{status:503})}
+  try{events=await listFlowQueueEvents()}catch{return NextResponse.json({ok:false,code:'FLOW_STORAGE_UNAVAILABLE',error:'The live intelligence spine is connected, but action storage is unavailable. No action was recorded. Check the Render ledger connection and migration readiness in Vercel.'},{status:503})}
   const lead=spine.people.items.find((item:any)=>String(item.id)===String(body.leadId));if(!lead)return NextResponse.json({ok:false,error:'Lead not found.'},{status:404});
   if(!isFubManager(session)&&(!ownId||lead.assignedUserId!==ownId))return NextResponse.json({ok:false,error:'This contact is assigned to another broker.'},{status:403});
   const actorId=isFubManager(session)?Number(body.actorUserId):ownId,actor=brokers.find(user=>user.id===actorId);if(!actor)return NextResponse.json({ok:false,error:'Select a valid broker.'},{status:400});
