@@ -1,3 +1,4 @@
+import {collectNextActionEvidence} from '@/lib/next-action/evidence';
 import {fetchFlowDelivery} from '@/lib/render/flow-accelerator';
 /** Assemble normalized FUB collections into the auditable management spine. */
 import {unstable_cache} from 'next/cache';
@@ -183,7 +184,7 @@ export async function getSpine(){
  */
 export async function getOperationalSpine(){const [people,users,tasks]=await Promise.all([getPeople({includeLearning:false}),getUsers(),getTasks()]);return {ok:true,mode:people.mode,people,users,tasks,agents:agentRollups(people.items,users.items)};}
 /** Re-read a candidate from FUB immediately before it can enter a live email. */
-export async function refreshOperationalLead(id:string|number,users:NormalizedUser[],tasks:NormalizedTask[]){
+export async function refreshOperationalLead(id:string|number,users:NormalizedUser[],tasks:NormalizedTask[],contextLead?:any,options:{fresh?:boolean}={}){
  if(shouldUseDemo())return getPeople({includeLearning:false}).then(result=>result.items.find(item=>String(item.id)===String(id))||null);
  const personId=encodeURIComponent(String(id)),userMap=new Map(users.map(user=>[user.id,user]));
  // Re-read only the selected contact and its open tasks after a broker action.
@@ -191,20 +192,25 @@ export async function refreshOperationalLead(id:string|number,users:NormalizedUs
  const [response,taskPage,collections]=await Promise.all([
   fubRequest<any>(`/people/${personId}`),
   paginate<any>(`/tasks?personId=${personId}&isCompleted=false`,3),
-  cachedFlowEvidence(personId),
+  options.fresh?readFlowEvidence(personId):cachedFlowEvidence(personId),
  ]);
  const freshTasks=taskPage.items.map(item=>normalizeTask(item,userMap));
- const base=normalizePersonBase(response.data,userMap),withNote=applyBrokerCadenceNote(base,collections.notes.items||[]);
+ const base=normalizePersonBase(response.data,userMap);
+ const prior=contextLead?.nextActionEvidence;
+ const nextEvidence=collections.calls.ok?collectNextActionEvidence({...response.data,vestaNextActionEvidence:prior},[],collections.calls.items,Date.now(),true):prior;
+ base.handRaiseAt=newestCommunicationDate(base.handRaiseAt,contextLead?.handRaiseAt,nextEvidence?.inquiry?.at);base.nextActionEvidence=nextEvidence;
+ const withNote=applyBrokerCadenceNote(base,collections.notes.items||[]);
  const evidence=applyFlowEvidence(withNote,{notes:collections.notes.items,calls:collections.calls.items,textMessages:collections.textMessages.items});
  return applyRoutingContext(enrichFlowContext({...enrichLead(evidence,freshTasks),flowCollectionAvailability:{notes:collections.notes.ok,calls:collections.calls.ok,textMessages:collections.textMessages.ok}},freshTasks));
 }
 // Detail collections are independently fallible. `ok:false` distinguishes an
 // unavailable connector from a genuine successful response containing no rows.
 async function safeCollection(path:string){try{const r=await paginate<any>(path,3);return {ok:true,items:r.items,metadata:r.metadata,pages:r.pages};}catch(error){return {ok:false,items:[],error:error instanceof Error?error.message:'Unavailable'};}}
-const cachedFlowEvidence=unstable_cache(async(personId:string)=>{
+const readFlowEvidence=async(personId:string)=>{
  const [notes,calls,textMessages]=await Promise.all([safeCollection(`/notes?personId=${personId}`),safeCollection(`/calls?personId=${personId}`),safeCollection(`/textMessages?personId=${personId}`)]);
  return {notes,calls,textMessages};
-},['flow-source-evidence-v1'],{revalidate:20});
+};
+const cachedFlowEvidence=unstable_cache(readFlowEvidence,['flow-source-evidence-v1'],{revalidate:20});
 export async function getLeadIntelligence(id:string,scope?:{person:any;users:NormalizedUser[]}){
  const scopedLead=scope?enrichLead(normalizePersonBase(scope.person,new Map(scope.users.map(user=>[user.id,user]))),[]):null;
  const spine:any=scope?{mode:'live',people:{items:[scopedLead]},users:{items:scope.users},tasks:{items:[]}}:await getFlowSpine();const lead=spine.people.items.find((x:any)=>String(x.id)===String(id));if(!lead)throw new Error('Lead not found');
