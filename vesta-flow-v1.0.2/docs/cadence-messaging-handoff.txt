@@ -1,0 +1,56 @@
+CADENCE / FLOW MESSAGING CONNECTION — 2026-11-21
+Prepared for production approval. Flow remains the source of truth for the
+versioned nurture engine. This release adds a read-only report under Cadence
+Reports; it does not add a customer sender or alter the live decision queue.
+
+Architecture
+Cadence saved Render snapshot + existing action receipts -> pure opportunity
+projection -> paged report -> identifier-only Flow handoff -> current FUB / owner
+/ queue / cadence review -> editable Flow draft -> existing manual FUB process.
+No extra source collection, database write, queue mutation or message send runs
+from the report. Existing application authentication and ownership checks apply.
+
+Shared engine
+lib/messaging/shared contains byte-identical exports of Flow's appointment,
+message-plan, history and nurture code/catalog. contract.json records SHA256
+hashes and catalog version. Tests reject drift. Flow's
+scripts/export-nurture-engine.mjs --check <Cadence-live-app> compares both apps;
+--write updates the pinned artifacts for a reviewed engine release. This is a
+versioned source distribution, not a new hosted orchestration service. Future
+engine changes must update the export and both reviews together; it does not
+silently download arbitrary new code at runtime.
+
+Manager workflow
+Reports -> Messaging opportunities. Filter by broker, status or search. Due
+opportunities and call-first actions are the default. Maximum100 rows per page.
+Scheduled/held and review-needed records remain accessible with separate filters.
+Review reasoning shows the objective/path. Review in Flow opens that exact lead
+and the saved broker context. A URL grants no privileges. Flow uses its signed-in
+identity and rechecks current ownership/eligibility. If the lead is not in the
+current broker's messaging queue, it selects nobody automatically and explains
+why. A stale source cannot redirect the user to another lead's draft.
+
+Signal and SOP boundaries
+Shared contextFor/messagePlan determine initial saved-data guidance. Full
+message generation remains in Flow with current evidence. Cadence does not
+infer all180 scenarios from stale summaries or manufacture a personalized draft.
+Call-first requirements are explicit; a supporting message does not satisfy a
+call obligation. Existing pauses, future follow-ups, exclusions, duplicate
+rules, contact restrictions and appointment/transaction boundaries remain.
+Source timestamps are retained. The report neither resets clocks nor increments
+attempt/conversation/appointment counts. No property link is inserted.
+
+Rollout
+Deploy the Flow handoff first, verify it, then Cadence and its existing linked
+coaching build. No new credentials, service, environment flag, database migration
+or Render deployment. Keep Flow's previously approved nurture flag unchanged.
+Recovery: restore the prior Vercel deployments; no source/database rollback is
+needed. Do not clear browser draft storage. Reverting the report while leaving
+the backward-compatible Flow URL parser is safe.
+
+Validation
+Cadence340 tests and source/type checks passed; Flow264 tests/typecheck passed.
+Browser synthetic205-contact fixture:100 rows/page, last page4 rows, broker
+filter102 rows, scheduled/held record present without a Flow handoff. Exact
+handoff URL contains only workspace, leadId and brokerId. Invalid target leaves
+Flow's contact selection blank. No real customer action or source API call.

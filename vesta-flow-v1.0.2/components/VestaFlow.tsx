@@ -6,6 +6,7 @@ import FlowAppearance from './FlowAppearance';
 import {confirmedActionReceipt,reconcileActionReceipts,mergeDailyProgress,type ActionReceipt} from '@/lib/flow/receipts';
 import BulkSchedule from './BulkSchedule';
 import AppointmentMessages from './AppointmentMessages';
+import {parseMessagingHandoff} from '@/lib/appointment/handoff';
 import {messagingQueue} from '@/lib/appointment/priority';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 
@@ -21,6 +22,7 @@ const killReasons=['Spam','Invalid information','Duplicate','No longer intereste
 
 export default function VestaFlow(){
  const [flowFocus,setFlowFocus]=useState('all'),[view,setView]=useState<View>('flow'),[data,setData]=useState<any>(null),[management,setManagement]=useState<any>(null),[brokerId,setBrokerId]=useState<number|null>(null),[selectedLeadId,setSelectedLeadId]=useState<string|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[actionMode,setActionMode]=useState<ActionMode>(null),[form,setForm]=useState<any>({}),[detail,setDetail]=useState<any>(null),[history,setHistory]=useState<any[]>([]),[detailTab,setDetailTab]=useState('brief'),[selectedException,setSelectedException]=useState<any>(null),[managementForm,setManagementForm]=useState<any>({kind:'management.reroute'}),[customerView,setCustomerView]=useState('all'),[customerBrokerId,setCustomerBrokerId]=useState(''),[customerSearch,setCustomerSearch]=useState(''),[customerSort,setCustomerSort]=useState('recent'),[taskSearch,setTaskSearch]=useState(''),[taskSort,setTaskSort]=useState('due');
+const [messageHandoff,setMessageHandoff]=useState<{leadId:string;brokerId:number}|null>(null);
 const flowRequest=useRef(false),requestSequence=useRef(0),submission=useRef(false);
  const actionReceipts=useRef<Map<string,ActionReceipt>>(new Map());
  const [actionTarget,setActionTarget]=useState<any>(null);
@@ -52,7 +54,7 @@ const flowRequest=useRef(false),requestSequence=useRef(0),submission=useRef(fals
   finally{window.clearTimeout(timeout);if(sequence===requestSequence.current){flowRequest.current=false;if(!background)setLoading(false)}}
  };
  const loadManagement=async()=>{setLoading(true);setError('');try{const response=await fetch('/api/flow/management',{cache:'no-store'}),json=await response.json();if(!response.ok||!json.ok)throw new Error(json.error||'Unable to load management queue');setManagement(json);const selected=json.exceptions.find((item:any)=>item.passEvent.id===selectedException?.passEvent?.id)||json.exceptions[0]||null;setSelectedException(selected);if(selected)setManagementForm((current:any)=>({...current,targetUserId:current.targetUserId||selected.recommendedBrokerId||''}))}catch(e){setError(e instanceof Error?e.message:'Unable to load management queue')}finally{setLoading(false)}};
- useEffect(()=>{loadFlow()},[]);
+ useEffect(()=>{const handoff=parseMessagingHandoff(new URLSearchParams(window.location.search));if(handoff){setMessageHandoff(handoff);setView('appointments');void loadFlow(handoff.brokerId)}else void loadFlow()},[]);
  useEffect(()=>{if((view!=='flow'&&!(view==='tasks'&&taskView==='smartlists'))||brokerId===null)return;const timer=window.setInterval(()=>{void loadFlow(brokerId,view==='flow'?selectedLeadId:null,true)},20000);return()=>window.clearInterval(timer)},[view,brokerId,selectedLeadId,taskView]);
  useEffect(()=>{if(view==='management')loadManagement()},[view]);
  const visibleQueue=useMemo(()=>(data?.queue||[]).filter((item:any)=>flowFocus==='new-contact'?item.relationship?.needsContact:flowFocus==='important'?item.relationship?.important:flowFocus==='nurture-plan'?item.relationship?.needsCadencePlan||item.relationship?.cadenceConflict:true),[data,flowFocus]);
@@ -102,7 +104,7 @@ const flowRequest=useRef(false),requestSequence=useRef(0),submission=useRef(fals
   {view==='flow'&&data&&nextActionPreviewEnabled()&&<button className="intelBack" onClick={()=>setView('next-actions')}>Review proposed next actions →</button>}
   {view==='flow'&&data&&<div className="flowFocus" role="group" aria-label="Action queue focus">{[['all','All due actions'],['new-contact','Buyer new / needs contact'],['important','Important'],['nurture-plan','Nurture planning']].map(([key,label])=><button key={key} className={flowFocus===key?'active':''} onClick={()=>setFlowFocus(key)}>{label}</button>)}<small>{Math.min(3,visibleQueue.length)} of {visibleQueue.length} Action Opportunities</small></div>}
   {view==='flow'&&data&&data.brokers?.length>0&&<BrokerFlow item={current} choices={visibleQueue.slice(0,3)} selectedLeadId={current?.leadId||null} onSelect={setSelectedLeadId} broker={currentBroker} completedToday={progress?.brokerId===brokerId?progress?.completed:null} onAction={startAction} onDetails={openIntelligence} onRefresh={()=>loadFlow(brokerId,current?.leadId||null)} loading={loading} actionsAvailable={data.storage?.available!==false} completionSyncAvailable={data.writeback?.enabled!==false}/>}
-  {view==='appointments'&&<AppointmentMessages key={`messages:${brokerId??'unresolved'}`} contacts={messageContacts} scope={`flow:${brokerId??'unresolved'}`} loadContact={loadAppointmentContact} onReturnToFlow={async id=>{setFlowFocus('all');setSelectedLeadId(id);setView('flow');const refreshed=await loadFlow(brokerId,id);if(!refreshed?.queue?.some((item:any)=>String(item.leadId)===id)){setError('This contact could not be confirmed in the active queue. Your message draft remains saved; no completion was recorded.');return}setMessageOutcomeLeadId(id)}}/>}
+  {view==='appointments'&&<AppointmentMessages key={`messages:${brokerId??'unresolved'}`} contacts={messageContacts} initialLeadId={messageHandoff?.leadId} scope={`flow:${brokerId??'unresolved'}`} loadContact={loadAppointmentContact} onReturnToFlow={async id=>{setFlowFocus('all');setSelectedLeadId(id);setView('flow');const refreshed=await loadFlow(brokerId,id);if(!refreshed?.queue?.some((item:any)=>String(item.leadId)===id)){setError('This contact could not be confirmed in the active queue. Your message draft remains saved; no completion was recorded.');return}setMessageOutcomeLeadId(id)}}/>}
   {view==='management'&&<ManagementFlow data={management} selected={selectedException} setSelected={setSelectedException} form={managementForm} setForm={setManagementForm} resolve={resolveException} refresh={loadManagement} loading={loading}/>}
   {view==='intelligence'&&<Intelligence detail={detail} history={history} tab={detailTab} setTab={setDetailTab} back={()=>setView('flow')}/>}
   </section>

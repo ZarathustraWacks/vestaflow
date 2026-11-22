@@ -4,17 +4,18 @@ import {paths,outcomes} from '@/lib/appointment/catalog';
 import {prepare,preparationGate,contextFor,contextKey,draftDisposition,messagePlan,edit,emptyWorkspace,exportReview,hold,reviewDraft,restore,type Context,type Workspace} from '@/lib/appointment/engine';
 import {rememberEditor,resumeEditor,saveWorkingText,persistWorkspace,evidenceKey} from '@/lib/appointment/editor';
 import {messageHistoryLabel,messagingEligible} from '@/lib/appointment/priority';
+import {handoffContactId} from '@/lib/appointment/handoff';
 import NurtureScenario from './NurtureScenario';
 import {nurturePacket} from '@/lib/appointment/nurture/connection';
 import styles from './appointment-messages.module.css';
 const uid=()=>crypto.randomUUID();
-export default function AppointmentMessages({contacts=[],scope='test',loadContact,onReturnToFlow}:{contacts?:any[];scope?:string;loadContact?:(id:string)=>Promise<any>;onReturnToFlow?:(id:string)=>void}){
+export default function AppointmentMessages({contacts=[],initialLeadId,scope='test',loadContact,onReturnToFlow}:{contacts?:any[];initialLeadId?:string;scope?:string;loadContact?:(id:string)=>Promise<any>;onReturnToFlow?:(id:string)=>void}){
  const [resolved,setResolved]=useState<Record<string,any>>({}),[selected,setSelected]=useState(''),[context,setContext]=useState<Context>(()=>contextFor(null)),[workspace,setWorkspace]=useState<Workspace>(emptyWorkspace),[body,setBody]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[readyScope,setReadyScope]=useState(''),[search,setSearch]=useState(''),[evidence,setEvidence]=useState<any>(null),[loadedFor,setLoadedFor]=useState(''),[evidenceLoading,setEvidenceLoading]=useState(false),[confirmed,setConfirmed]=useState(false),[holdReason,setHoldReason]=useState(''),[showHold,setShowHold]=useState(false),[saveState,setSaveState]=useState(''),[storageConflict,setStorageConflict]=useState(false),[propertyResearch,setPropertyResearch]=useState<any>(null),[copying,setCopying]=useState(false);
  const copyBusy=useRef(false);
  const storedVersion=useRef<string|null>(null),baseline=useRef<Context>(contextFor(null)),loadContactRef=useRef(loadContact);loadContactRef.current=loadContact;
  const saved=useRef<Workspace>(emptyWorkspace()),attempted=useRef(''),storageKey='vesta:appointment-messages:v1:'+scope,ready=readyScope===storageKey;
  useEffect(()=>{setReadyScope('');setError('');attempted.current='';try{const stored=localStorage.getItem(storageKey),next=stored?restore(JSON.parse(stored)):emptyWorkspace();storedVersion.current=stored;saved.current=next;setWorkspace(next);setStorageConflict(false);setSaveState(stored?'Saved in this browser':'');setReadyScope(storageKey)}catch{setError('Saved draft history could not be read. Export or recover it before preparing more messages.')}},[storageKey]);
- useEffect(()=>{if(!ready||selected)return;const prior=saved.current.selectedLeadId;setSelected(prior&&contacts.some(item=>String(item.id)===prior)?prior:contacts.length?String(contacts[0].id):'')},[ready,contacts,selected]);
+ useEffect(()=>{if(!ready||selected)return;const prior=saved.current.selectedLeadId;setSelected(handoffContactId(contacts,initialLeadId,prior))},[ready,contacts,selected,initialLeadId]);
  useEffect(()=>{const warn=(event:BeforeUnloadEvent)=>{if(saveState.startsWith('Not saved')){event.preventDefault();event.returnValue=''}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn)},[saveState]);
  const lead=contacts.find(item=>String(item.id)===selected)||resolved[selected];
  const queueLeadRef=useRef(lead);queueLeadRef.current=lead;
@@ -49,6 +50,7 @@ export default function AppointmentMessages({contacts=[],scope='test',loadContac
  return <div className={styles.workspace}>
   <section className={styles.hero}><div><h2>Your next message</h2><span>Newest leads first. Review the suggestion and send in FUB.</span></div><b>{contacts.length} ready for review</b></section>
   <div className={styles.selectors}><label>Find a lead<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name, stage or source"/></label><label>Priority order<select value={selected} onChange={e=>selectLead(e.target.value)}><option value="">Choose a lead</option>{filtered.slice(0,200).map((item,index)=><option key={item.id} value={String(item.id)}>{index+1}. {item.name} · {resolved[String(item.id)]?messageHistoryLabel(resolved[String(item.id)]):item.messageReason||item.stage}</option>)}{lead&&!filtered.slice(0,200).some(item=>String(item.id)===selected)&&<option value={selected}>{lead.name}</option>}</select></label></div>
+  {initialLeadId&&!contacts.some(item=>String(item.id)===initialLeadId)&&<p className={styles.notice}>The requested contact is outside this broker’s current eligible messaging queue. No other contact was selected automatically. Check the current owner, cadence or hold in FUB before proceeding.</p>}
   {!contacts.length&&<section className={styles.panel}><h3>No eligible messaging actions are due</h3><p>This list follows the selected broker's active Flow queue. Zenlist duplicates, excluded records, held actions and follow-ups not yet due are left out.</p></section>}
   {error&&<p className={styles.error} role="alert">{error}</p>}{notice&&<p className={styles.notice} role="status">{notice}</p>}
   {lead&&<section className={styles.panel}>
