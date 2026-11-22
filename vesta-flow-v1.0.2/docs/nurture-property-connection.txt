@@ -1,0 +1,96 @@
+VESTA FLOW — NURTURE AND PROPERTY PREPARATION
+Version: 2026-11-21-v1
+Release status: prepared; production activation requires Peter's approval.
+
+WHAT WORKS IN THIS BUILD
+Appointment Messages can use the archived 60-situation, 180-approach library
+(1,080 SMS/email opening/follow-up/alternate-angle records). The existing
+manual FUB handoff, outcome recording, saved edits and held drafts remain.
+NEXT_PUBLIC_VESTA_NURTURE_LIBRARY=true enables this connection at build time.
+Missing/false restores the existing messaging engine; stored work is retained.
+
+Default drafting is deliberately narrow: a pending incoming text is addressed
+before nurture; recorded search activity offers help without disclosing tracking;
+sparse history asks what help is useful. Waiting/conditional customers get a
+permission/frequency question. Ready/appointment-request outcomes retain the
+existing focused appointment-window path. No new cadence intervals are added.
+Other specific situations require the broker to choose a source, review the
+scenario/approach and provide the required customer-safe facts. This is not an
+automatic interpretation of all 180 situations from free-form notes. The library
+is not proof that every scenario applies to every contact.
+
+BROKER PROCESS
+Open Appointment Messages. Review the proposed text. For a more specific draft,
+expand Choose a specific nurture situation, select the situation and approach,
+select supporting FUB evidence, provide the required facts and confirm review.
+Edit the draft, confirm recipient/channel permission, copy and send in FUB.
+Return to Flow and record the actual outcome. Hold saves exact wording and
+feedback for review without sending, completing an action or training a model.
+Email subjects are shown for use in FUB. Edits and choices save in this browser.
+Specific scenario reviews expire after 24 hours; current FUB evidence is checked
+again before Copy. Changed owner, recipient, context or history blocks copying
+and preserves the existing draft for review. Unsaved/cross-tab conflicts retain
+existing protection. A release does not overwrite held or edited drafts.
+
+FOLLOW-UPS AND HISTORY
+A follow-up or alternate angle needs a matching real outbound FUB text by the
+current broker, after the corresponding proposal, and an eligible cadence action.
+Copy, Hold and Done alone are not send receipts. Email history is not yet read
+by this adapter, so it does not establish email follow-up eligibility.
+A dated conversation hook requires an explicit connected personal call, positive
+duration and the same broker ID. Duration alone, notes and imports cannot claim
+"we spoke." Original dates are retained with month and year.
+Distinctness uses browser workspace history and supplied FUB receipts. This
+release does not add a cross-device shared message reservation ledger or claim
+global nonrepetition across brokers. No automatic sending or policy training.
+
+PROPERTY PREPARATION — INSERTION OFF
+Uses the events already loaded for the authorized contact; zero additional
+Zenlist API calls or roster scans. FUB's API can omit activity visible in its UI.
+Extract structured property/search evidence with original source IDs and dates.
+Store observations separately from confirmed preferences and current inventory.
+A direct Zenlist listing URL or market + MLS reference can resolve a property;
+address-only candidates require review, with unit/ZIP retained. Conflicting
+identifiers hold the match. A property match never links a customer identity.
+The pure saved-data adapter can match supplied Zenlist listing records across
+customer IDs. It does not require that this FUB customer has a Zenlist account.
+The current Flow route does not fetch the Zenlist database; it exposes FUB
+property evidence and direct references only. The saved-record join remains a
+prepared adapter, awaiting the supported source connection.
+
+Fresh supplied inventory can be ranked against broker-confirmed criteria.
+Inactive, private, older-than-24-hour, future-dated and conflicting duplicate
+listings are excluded. This is deterministic saved-candidate ranking, not a
+live similar-homes or market inventory search. The 24-hour research freshness
+threshold is a staging default, not an established Zenlist update guarantee.
+PROPERTY_INSERTION_ENABLED is hard false. Property-specific situations and
+property/resource-link slots are blocked in the connected message engine.
+No search, invitation, broker-branded URL or property price is invented.
+No property text or link is automatically appended to outgoing messages.
+
+PENDING ZENLIST ANSWER
+Confirm supported noninteractive inventory search/details/status/prices,
+broker-branded property link and customer connect-link formats, authorization,
+MLS rights, incremental refresh/cache policy and rate limits. Implement the
+supported provider against this prepared evidence/matching contract, test live
+examples including unconnected customers, then seek separate activation approval.
+
+RELEASE / ROLLBACK
+This is a Flow-only release. No Render service, Cadence rule, FUB write path,
+queue ordering, timer or infrastructure changes are part of the deployment.
+Enable the public build switch only for the approved Flow release. Keep the
+property insertion constant false. Preserve the previous production deployment
+and existing browser storage. To roll back, restore the prior deployment or
+rebuild with the nurture switch false. Do not clear broker storage or histories.
+
+SOURCES AND ARCHIVE
+The 60 original OUT techniques and A/B/C approaches remain in
+lib/appointment/nurture/catalog.json. Existing editorial archive documents,
+PDF and complete JSON remain versioned in the separate nurture-library output.
+The library's existing selection rules and Departments coaching remain binding.
+Source documentation checked 2026-11-21:
+https://docs.followupboss.com/reference/events-get
+https://docs.followupboss.com/reference/idx-integration
+https://openapidocs.zenlist.com/
+Read-only API/browser findings and the inventory-access gap are archived in
+Zenlist-Inventory-and-Metadata-Inspection.html in the workspace outputs.

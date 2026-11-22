@@ -101,3 +101,8 @@ identity/owner/channel semantics with real contact comparisons. Connect shared
 history/reservation, preserve edited/held drafts, recheck immediately before any
 manual FUB handoff, and keep consent and current SOP in control. Deploy only with
 Peter's standing production approval. This build does not request sender access.
+
+Connection update prepared 2026-11-21
+See docs/nurture-property-connection.txt for the staged Flow editor connection,
+evidence review, follow-up receipts, release switch and remaining limitations.
+The catalog stays an editorial archive; production is unchanged until approved.

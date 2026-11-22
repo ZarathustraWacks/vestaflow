@@ -1,8 +1,10 @@
 import {contactHistoryState} from '../policy/contact-history';
 import {paths,outcomes} from './catalog';
 import {MESSAGE_POLICY_VERSION,messageLanguage,recordedTopic,coachingSources} from './playbook';
-export type Context={leadId:string;name:string;stage:string;source:string;lane:string;consent:boolean;dnc:boolean;sourceDnc:boolean;pathId:string;outcomeId:string;condition:string;conditionCleared:boolean;managerReason:string;identityVerified:boolean;channel:'sms'|'email';snapshotId:string;cadencePlanningRequired?:boolean;messagePolicyVersion?:string;topicPathId?:string};
-export type Draft={id:string;leadId:string;snapshotId:string;body:string;revision:number;contextKey:string;approvedKey:string|null;pathId:string;outcomeId:string;at:string;mode:'review-only';status:'draft'|'approved'|'held'|'simulated-delivery'|'simulated-failure'};
+import {connectedProposal,type NurturePacket,type Selection} from './nurture/connection';
+import type {Proposal} from './nurture/engine';
+export type Context={leadId:string;name:string;stage:string;source:string;lane:string;consent:boolean;dnc:boolean;sourceDnc:boolean;pathId:string;outcomeId:string;condition:string;conditionCleared:boolean;managerReason:string;identityVerified:boolean;channel:'sms'|'email';snapshotId:string;cadencePlanningRequired?:boolean;messagePolicyVersion?:string;topicPathId?:string;nurture?:NurturePacket;nurtureSelection?:Selection};
+export type Draft={id:string;leadId:string;snapshotId:string;body:string;revision:number;contextKey:string;approvedKey:string|null;pathId:string;outcomeId:string;at:string;mode:'review-only';status:'draft'|'approved'|'held'|'simulated-delivery'|'simulated-failure';nurture?:Proposal};
 export type History={id:string;leadId:string;body:string;at:string;decisionId:string;kind:'proposed'|'edited'|'simulated-delivery'|'simulated-failure'};
 export type Result={id:string;decisionId:string;kind:'customer_response'|'appointment_set';at:string;appointmentId?:string;verification:'simulated'};
 export type TrainingCandidate={id:string;decisionId:string;leadId:string;revision:number;snapshotId:string;draftContextKey:string;originalBody:string;editedBody:string;reason:string;context:Context;at:string;reviewStatus:'pending';trainingEligible:false;sent:false};
@@ -15,7 +17,7 @@ export const contextFor=(lead:any):Context=>{
  const appointment=/^appointment (set|met)$/i.test(stage),requestAt=Math.max(0,...[lead?.handRaiseAt,lead?.customerResponseAt].map(value=>Date.parse(value||'')).filter(Number.isFinite)),outreachAt=Date.parse(lead?.brokerOutreachAt||''),freshRequest=Number.isFinite(requestAt)&&requestAt<=Date.now()&&Date.now()-requestAt<=7*86400000&&(!Number.isFinite(outreachAt)||requestAt>outreachAt),planMissing=lead?.cadenceStatus==='unknown'&&/^nurture$/i.test(stage)&&!freshRequest;
  const outcomeId=appointment?'appointment-set':condition||future?'not-ready':recorded.kind==='review'?'wrong':recorded.kind==='connected'||contactHistoryState(lead)==='prior-conversation'?'reply':'no-response';
  const topicPathId=recordedTopic(recorded),pathId=lead?.contextConflict?'hygiene':appointment?'appointment':condition?'conditional':future?'timing':/^closed$/i.test(stage)?'relationship':topicPathId||(/^nurture$/i.test(stage)?'timing':lead?.leadLane==='seller'?'seller':'new');
- return {messagePolicyVersion:MESSAGE_POLICY_VERSION,...(topicPathId?{topicPathId}:{}),...(planMissing?{cadencePlanningRequired:true}:{}),leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId,outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
+ return {...(lead?.nurturePreparation?{nurture:lead.nurturePreparation}:{}),messagePolicyVersion:MESSAGE_POLICY_VERSION,...(topicPathId?{topicPathId}:{}),...(planMissing?{cadencePlanningRequired:true}:{}),leadId:String(lead?.id||''),name:lead?.name||'',stage:lead?.stage||'',source:lead?.source||'',lane:lead?.leadLane||'buyer',consent:false,dnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),sourceDnc:Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail)),pathId,outcomeId,condition,conditionCleared:false,managerReason:'',identityVerified:false,channel,snapshotId:String(lead?.decisionSnapshotId||'unverified')};
 };
 export const normalize=(text:string)=>text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export const contextKey=(c:Context)=>JSON.stringify(c);
@@ -71,6 +73,13 @@ export const assemble=(w:Workspace,c:Context,id:string,now=new Date())=>buildDra
 function buildDraft(w:Workspace,c:Context,id:string,now:Date,preparation:boolean):Workspace{
  restore(w);uniqueId(id,w);const blocked=preparation?preparationGate(c):gate(c);if(blocked)throw new Error(blocked);
  if(w.history.length>=20000||w.drafts.length>=20000)throw new Error('Review history is full; export and reconcile it before generating more drafts.');
+ const waiting=step({...c,identityVerified:true,consent:true})==='Permission / wait';
+ if(c.nurture&&(!['ready','request'].includes(c.outcomeId)||c.nurtureSelection||waiting)){
+  const proposal=connectedProposal({leadId:c.leadId,name:c.name,channel:c.channel,packet:c.nurture,selection:c.nurtureSelection,waiting,drafts:w.drafts,history:w.history,now});
+  if(proposal.status==='hold')throw new Error('Review the nurture scenario: '+proposal.reason+(proposal.missing?.length?' ('+proposal.missing.join(', ')+')':''));
+  const draft:Draft={id,leadId:c.leadId,snapshotId:c.snapshotId,body:proposal.body,revision:1,contextKey:contextKey(c),approvedKey:null,pathId:c.pathId,outcomeId:c.outcomeId,at:now.toISOString(),mode:'review-only',status:'draft',nurture:proposal};
+  return {...w,drafts:[...w.drafts,draft],history:[...w.history,{id:'proposed:'+id,leadId:c.leadId,body:proposal.body,at:draft.at,decisionId:id,kind:'proposed'}]};
+ }
  const language=messageLanguage(c.pathId,c.topicPathId),plan=messagePlan(c);
  const invitations=[`Would a five-minute call about ${language.focus} be useful?`,`Would you be open to a short conversation about ${language.focus}?`,`Could we find five minutes to work through ${language.focus}?`,`Would you like to arrange a quick planning call about ${language.focus}?`];
  const availability=[`What day and time window would work for a short call about ${language.focus}? I will check availability before confirming.`,`When would you prefer to talk through ${language.focus}? I will verify the time before anything is booked.`,`Could you share a preferred window for a conversation about ${language.focus}? I will check the calendar first.`,`What time window would suit you for a planning call about ${language.focus}? We can confirm the details once availability is checked.`];
@@ -106,6 +115,10 @@ export const approve=(w:Workspace,c:Context,id:string)=>review(w,c,id,false);
 function review(w:Workspace,c:Context,id:string,preparation:boolean):Workspace{
  restore(w);const blocked=preparation?preparationGate(c):gate(c);if(blocked)throw new Error(blocked);const d=w.drafts.find(x=>x.id===id);
  if(!d||d.contextKey!==contextKey(c)||d.leadId!==c.leadId||w.drafts.filter(x=>x.leadId===c.leadId).at(-1)?.id!==id||!['draft','approved'].includes(d.status))throw new Error('Contact context or draft changed; generate and review a fresh draft.');
+ if(d.nurture&&c.nurture){
+  const check=connectedProposal({leadId:c.leadId,name:c.name,channel:c.channel,packet:c.nurture,selection:c.nurtureSelection,waiting:step({...c,identityVerified:true,consent:true})==='Permission / wait',drafts:w.drafts.filter(x=>x.id!==id),history:w.history.filter(x=>x.decisionId!==id)});
+  if(check.status!=='broker-review'||check.contentId!==d.nurture.contentId)throw new Error('Review the nurture evidence again before copying: '+(check.status==='hold'?check.reason:'selected wording changed'));
+ }
  if(!d.body.trim())throw new Error('The proposed message is empty.');
  if(w.history.some(h=>h.decisionId!==id&&normalize(h.body)===normalize(d.body)))throw new Error('This wording was already proposed. Edit it or generate a distinct version.');
  return {...w,drafts:w.drafts.map(x=>x.id===id?{...x,status:'approved',approvedKey:contextKey(c)+'|'+x.revision+'|'+x.body}:x)};
