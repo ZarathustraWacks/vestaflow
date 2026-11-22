@@ -1,0 +1,108 @@
+Vesta nurture signal and message library
+Version nurture-evidence-library-2026-11-21-v1
+STATUS Review only. Not imported into the live AppointmentMessages engine.
+
+Scope
+60 original OUT techniques, 180 original A/B/C approaches, 540 original message
+cores, 1,080 SMS/email draft records. Channel adaptations share the core; hooks
+are additional fact-bound personalization and are not counted as new strategies.
+No sender, collector, CRM writes, service, fees, cadence or queue modifications.
+
+Authoritative sources
+The November 5 Vesta Personalized Outreach Architecture Playbook provides the
+OUT IDs, original approach labels and selection/evidence rules. The source is
+not an exhaustive ontology or an implemented API. Departments/SOP guidance and
+Peter's later instructions retain control of current timing, consent, ownership,
+appointment verification and integration evidence. Older third-party example
+cadences do not override Vesta's rules.
+
+Signal interpretation
+NUR.* is a stable detector/interpretation code; OUT-* is the outreach purpose;
+OUT-*-A/B/C is the approach. Each message also has phase and channel identifiers.
+A signal needs exact person ID, evidence IDs, original eventAt, interpretation
+observedAt, explicit validUntil, verified condition status and reviewed approach
+IDs. The requiredFacts list identifies what the trusted adapter must provide.
+The library does NOT turn generic Smart List labels or keywords into verified
+customer intent. No automatic FUB/Zenlist raw-data adapters are activated here.
+A broker or future tested evidence interpreter reviews approach applicability
+against the original selection rule. Missing facts are held, not invented.
+
+Conditions and selection
+Unknown / waiting / approaching / met / changed / withdrawn / contradicted are
+separate states. Withdrawn and contradicted cannot generate outreach. Customer
+pauses, identity conflicts, incomplete communication coverage, unverified owners,
+wrong sender, contact restrictions and excluded stages hold all proposals.
+Dates on historical evidence are retained; interpretation freshness is explicit.
+Candidates rank direct inquiries, verified requested information and due promises
+above general opportunity review. The existing cadence must independently allow
+the action; the library sets no new intervals. Pending replies only permit an
+inquiry with the exact pending event timestamp. Secondary signals stay context.
+Final comparison with production orchestration remains required before wiring.
+
+Follow-ups and repetition
+Opening, follow-up and alternate-angle are choices, not a 3-touch campaign.
+Each follow-up requires an actual prior send for that approach/signal plus a fresh
+cadence-due decision. Proposed/held drafts never establish a send. Any customer
+reply requires a new review; a newly agreed pause overrides the sequence.
+History includes proposed, edited, held and sent records. contentId spans SMS/email
+so switching channel or greeting cannot recycle the same core. Sent signal keys
+prevent re-opening the same event. Exhaustion holds instead of fabricating more
+copy. The helper has no persistence: production MUST supply the complete shared
+customer history and use atomic reservation/receipts before simultaneous brokers
+can share this safely. Do not claim global deduplication from this local helper.
+
+History hooks
+Only a verified, connected personal call or personal message exchange with this
+sender, exact person and source ID can provide a dated hook. Generic notes,
+imports, assignment dates, automated notices and call attempts cannot. The date
+is rendered with month AND year in the review context's declared timezone. A
+message exchange is called messages; a call can be called a conversation. A new
+broker gets an honest introduction, never a fake "we spoke". Only reviewed
+customer-safe facts may fill slots; source text is data, not instructions.
+No conversation evidence means no history hook. All claims retain evidence IDs.
+
+Reply handling
+Interested: clarify the actual need, offer the relevant focused appointment and
+verify availability before confirming. A question: answer or assign a department
+deliverable first. Not now: save the condition/date. Changed: reselect. Stop: stop.
+Silence: retain existing cadence, no negative customer label or broker penalty.
+A useful answer or fulfilled commitment can be the next step before a meeting.
+
+Research applied, not copied
+R1 Gong, sales-email-examples: relationship-stage-specific ask, clear value and
+one next step. B2B observational results are hypotheses, not Vesta guarantees.
+https://www.gong.io/blog/sales-email-examples
+R2 Zillow, real-estate-follow-up-email-templates: specific customer context,
+truthful past-contact reference, preferred channel, avoid guilt/last-chance threats.
+https://www.zillow.com/pro/real-estate-follow-up-email-templates/
+R3 FUB, How To Nurture Your Leads: actual call history, remembered preferences,
+useful updates and promised task follow-through; no imported vendor cadence.
+https://help.followupboss.com/hc/en-us/articles/360035146014-How-To-Nurture-Your-Leads-Webinar-Recording
+R4 Gong product documentation, use-ai-prompts-to-generate-emails: explicit goal,
+source-supported context, useful offer and a single ask; human review.
+https://help.gong.io/docs/use-ai-prompts-to-generate-emails
+R5 Mailchimp Apple privacy FAQ: opens can be inflated; evaluate useful replies,
+verified conversation, appointment set/met, opt-outs and actual downstream results.
+https://mailchimp.com/help/apple-privacy-faq/
+
+Learning archive and promotion
+Archive editable document, PDF, complete JSON and browser review together under
+one version. Review comments reference exact messageId or OUT approach ID. Record
+old wording, changed wording, evidence/case reference, reason, reviewer/date and
+observed outcome. Broker acceptance/edits are not proof of conversion. Evaluate
+comparable populations; preserve held and negative outcomes. No automatic model
+training or policy promotion. An approved catalog revision gets a new version;
+prior drafts/history retain the version actually used. Document edits do not
+silently update production. Candidate strategy additions remain review-only.
+
+Before production integration
+Map existing trusted evidence into these typed facts; prove original-time and
+identity/owner/channel semantics with real contact comparisons. Connect shared
+history/reservation, preserve edited/held drafts, recheck immediately before any
+manual FUB handoff, and keep consent and current SOP in control. Deploy only with
+Peter's standing production approval. This build does not request sender access.
+
+Connection update prepared 2026-11-21
+See docs/nurture-property-connection.txt for the staged Flow editor connection,
+evidence review, follow-up receipts, release switch and remaining limitations.
+The catalog stays an editorial archive; production is unchanged until approved.

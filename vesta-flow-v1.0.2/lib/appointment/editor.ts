@@ -11,7 +11,7 @@ export function resumeEditor(w:Workspace,lead:any){
  if(!stored||stored.baseKey!==evidenceKey(baseline))return {context:baseline,holdReason:stored?.holdReason||'',choicesChanged:Boolean(stored)};
  const c=stored.context,raw=lead?.raw||{};const channel:Context['channel']=c.channel==='email'?'email':'sms';
  const dnc=Boolean(raw.doNotContact||lead?.doNotContact||(channel==='sms'?raw.doNotText:raw.doNotEmail));
- return {context:{...baseline,pathId:c.pathId,outcomeId:c.outcomeId,condition:c.condition,conditionCleared:c.conditionCleared,managerReason:c.managerReason,topicPathId:c.topicPathId,channel,dnc,sourceDnc:dnc,consent:false,identityVerified:false},holdReason:stored.holdReason,choicesChanged:false};
+ return {context:{...baseline,pathId:c.pathId,outcomeId:c.outcomeId,condition:c.condition,conditionCleared:c.conditionCleared,managerReason:c.managerReason,topicPathId:c.topicPathId,nurtureSelection:c.nurtureSelection,channel,dnc,sourceDnc:dnc,consent:false,identityVerified:false},holdReason:stored.holdReason,choicesChanged:false};
 }
 export function saveWorkingText(w:Workspace,id:string,body:string,now=new Date()):Workspace{
  restore(w);const d=w.drafts.find(x=>x.id===id);
