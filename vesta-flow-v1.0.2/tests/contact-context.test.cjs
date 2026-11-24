@@ -32,3 +32,28 @@ const flowNote=(outcome)=>({id:8,personId:42,systemName:'Vesta',isExternal:true,
 test('later no-answer advances cadence without erasing seller, timeframe or condition',()=>{const attempt={...note,id:8,created:'2026-11-08T12:00:00Z',body:'Call Outcome : No Answer'};const l=run({}, {notes:[note,attempt]});assert.equal(l.contactContext.kind,'long-term');assert.equal(l.contactContext.lane,'seller');assert.equal(l.contactContext.timeframe,'9-12 Months');assert.equal(l.contactContext.conditional,true);assert.equal(l.contactContext.latestCommunication.outcome,'No Answer');assert.equal(l.lastCommunicationAt,attempt.created)});
 test('Flow Done communication outcomes share contact policy while task planning never resets it',()=>{for(const outcome of ['Connected conversation','Outbound call — no answer','Left voicemail','Outbound text sent','Outbound email sent']){const l=run({}, {notes:[note,flowNote(outcome)]});assert.equal(l.contactContext.kind,'long-term');assert.equal(l.contactContext.conditional,true);assert.equal(l.contactContext.latestCommunication.source,'Vesta Flow');assert.equal(l.lastCommunicationAt,'2026-11-08T12:00:00Z')}for(const outcome of ['Follow-up task created','Follow-up scheduled','Appointment confirmed']){const l=run({}, {notes:[flowNote(outcome)]});assert.equal(l.lastCommunicationAt,null);assert.equal(l.contactContext,null)}});
 test('a later communication-only call does not silently turn a seller back into a buyer',()=>{const l=run({tags:[]},{notes:[note],calls:[{id:9,personId:42,systemName:'Shilo',isIncoming:false,created:'2026-11-08T12:00:00Z',outcome:'Connected'}]});assert.equal(l.leadLane,'seller');assert.equal(l.contactContext.outcome,'Long Term Lead');assert.equal(l.contactContext.latestCommunication.outcome,'Connected');assert.equal(l.documentedContactAt,'2026-11-08T12:00:00Z');assert.equal(l.contactContext.conditional,true)});
+
+test('due cadence names the existing action and interval through contact enrichment and queue',()=>{
+ const l=run({stage:'Nurture',tags:['Longterm Nurture Monthly']},{});
+ assert.equal(l.decision.label,'Nurture follow-up — monthly (30 days)');
+ const before=process.env.NEXT_PUBLIC_VESTA_NEXT_ACTION_OPERATIONAL;
+ try{for(const enabled of ['false','true']){process.env.NEXT_PUBLIC_VESTA_NEXT_ACTION_OPERATIONAL=enabled;const item=buildFlowQueue([l],[],30)[0];assert.ok(item);assert.equal(item.recommendedAction,l.decision.label);assert.equal(item.lead.cadenceDueAt,l.cadenceDueAt);assert.equal(item.lead.cadenceStatus,'overdue');}}
+ finally{if(before===undefined)delete process.env.NEXT_PUBLIC_VESTA_NEXT_ACTION_OPERATIONAL;else process.env.NEXT_PUBLIC_VESTA_NEXT_ACTION_OPERATIONAL=before;}
+});
+test('due action describes seller timeframe and active buyer without inventing a channel',()=>{
+ const seller=run({stage:'Nurture',tags:['Seller','3-6 Months'],timeframe:'3-6 Months'},{});
+ const {dueCadenceAction}=require('../lib/policy/cadence-action.ts');
+ assert.equal(dueCadenceAction({...seller,cadenceKey:'seller-3-6'}),'Follow up on selling plans — every 14 days');
+ const active=run({stage:'Showing Homes',tags:[],lastActivity:'2026-09-01T00:00:00Z'},{});
+ assert.equal(active.decision.label,'Follow up on the search or offer — every 2 days');
+ assert.equal(dueCadenceAction({cadenceKey:'nurture-bi-monthly',doNotCall:true}),'Review call restriction before the 60-day nurture follow-up');
+ assert.equal(dueCadenceAction({cadenceKey:'unknown'}),'Confirm the follow-up cadence and next action');
+});
+test('specific scheduled task and initial connection actions retain their existing wording',()=>{
+ const {currentNextAction}=require('../lib/next-action/operational.ts');
+ const l=run({stage:'Nurture',tags:['Longterm Nurture Monthly']},{});
+ const task=currentNextAction({...l,nextTaskAt:'2026-11-09T10:00:00Z',nextTaskName:'Send the requested figures'},[],now);
+ assert.equal(task.plan.label,'Complete task: Send the requested figures');
+ const fresh=run({lastInquiry:'2026-11-09T10:00:00Z'});
+ assert.equal(fresh.decision.label,'Respond to hand raise');
+});
