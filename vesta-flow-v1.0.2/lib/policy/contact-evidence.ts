@@ -1,4 +1,5 @@
 /** Shared source evidence. Source CRM fields are preserved, never written. */
+import {dueCadenceAction} from './cadence-action';
 import {enrichLead} from '@/lib/spine/governance';
 import {cadencePolicy,policyStage} from '@/lib/policy/vesta';
 import {newestCommunicationDate} from '@/lib/policy/communication';
@@ -46,7 +47,7 @@ export function enrichContactContext(lead:any,tasks:any[]=[],appointments:any[]=
  }
  if(outcome&&Array.isArray(result.operationalClocks))result={...result,operationalClocks:result.operationalClocks.map((item:any)=>item.key==='first-contact-attempt'&&Date.parse(item.clearedAt)===Date.parse(outcome.at)&&item.status==='met'?{...item,status:'resolved',clearingAction:'A recorded communication outcome resolves the open lead obligation. Its note timestamp does not certify broker first-response latency.'}:item)};
  const intentAt=newestCommunicationDate(result.handRaiseAt,result.customerResponseAt),intentFresh=intentAt&&Date.now()-Date.parse(intentAt)<=7*86400000&&(!result.brokerOutreachAt||Date.parse(intentAt)>Date.parse(result.brokerOutreachAt));
- if(result.decision?.matchedRule==='cadence.active-overdue'&&!intentFresh)result={...result,decision:{...result.decision,urgency:'Today',label:'Follow the due cadence',rationale:'Follow-up is due under the approved plan. A system update or broker outreach is not evidence of fresh customer intent.',matchedRule:'context.cadence-due-no-new-intent'}};
+ if(result.decision?.matchedRule==='cadence.active-overdue'&&!intentFresh)result={...result,decision:{...result.decision,urgency:'Today',label:dueCadenceAction(result),rationale:'Follow-up is due under the approved plan. A system update or broker outreach is not evidence of fresh customer intent.',matchedRule:'context.cadence-due-no-new-intent'}};
  if(contextConflict)result={...result,contextConflict,decision:{...result.decision,type:'human-review',urgency:'Today',label:'Review conflicting intent and nurture plan',rationale:'Recorded communication intent conflicts with the current CRM classification or nurture plan. Confirm the latest evidence before changing the plan.',matchedRule:'context.intent-conflict'}};
  return result;
 }

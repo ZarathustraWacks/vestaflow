@@ -1,4 +1,5 @@
 /** Produce one explainable management action from normalized governance facts. */
+import {dueCadenceAction} from '@/lib/policy/cadence-action';
 import {isOperationalLead} from '@/lib/operational-eligibility';
 import { NormalizedLead } from '@/lib/domain/types';
 
@@ -8,7 +9,7 @@ const daysSince=(value:string|null)=>value?Math.max(0,Math.floor((Date.now()-new
 
 // Rule order is intentional: classification and ownership blockers precede
 // cadence, recovery, and general risk review so later heuristics cannot mask them.
-export function decideLead(lead:Pick<NormalizedLead,'assignedUserId'|'assignedUserName'|'ageBand'|'lastCommunicationAt'|'lastActivityAt'|'riskLevel'|'governanceScore'|'stage'|'leadLane'|'cadenceStatus'|'overdueTaskCount'|'responseSlaStatus'> & Pick<Partial<NormalizedLead>,'operationalResponseSlaStatus'>):LeadDecision{
+export function decideLead(lead:Pick<NormalizedLead,'assignedUserId'|'assignedUserName'|'ageBand'|'lastCommunicationAt'|'lastActivityAt'|'riskLevel'|'governanceScore'|'stage'|'leadLane'|'cadenceStatus'|'overdueTaskCount'|'responseSlaStatus'> & Pick<Partial<NormalizedLead>,'operationalResponseSlaStatus'|'cadenceKey'|'cadenceLabel'|'cadenceStage'|'tags'|'timeframeStatus'|'doNotCall'>):LeadDecision{
  const activityDays=daysSince(lead.lastActivityAt),noOwner=lead.assignedUserId===null;
  const completeness=Math.round(100*[lead.assignedUserName,lead.lastActivityAt,lead.lastCommunicationAt,lead.stage&&!['','Unknown'].includes(lead.stage),!['candidate-rental','needs-classification'].includes(lead.leadLane)].filter(Boolean).length/5);
  const evidenceQuality:LeadDecision['evidenceQuality']=completeness>=80?'High':completeness>=50?'Medium':'Low';
@@ -19,7 +20,7 @@ export function decideLead(lead:Pick<NormalizedLead,'assignedUserId'|'assignedUs
  const operationalSla=lead.operationalResponseSlaStatus??lead.responseSlaStatus;
  if(operationalSla==='pending'||operationalSla==='breached')return result('response.first-contact-four-hour',{type:'contact',label:'Respond to hand raise',urgency:'Immediate',rationale:operationalSla==='pending'?'An active hand raise is inside its four-business-hour follow-up window; broker responsibility is unverified.':'The lead follow-up window elapsed without qualifying broker action; review assignment and evidence before attributing responsibility.',consequence:'High-intent demand may convert with another brokerage.'});
  if(activityDays<=7&&lead.cadenceStatus==='overdue')return result('cadence.active-overdue',{type:'contact',label:'Contact today',urgency:'Immediate',rationale:'Recent activity is present and the approved cadence is overdue.',consequence:'Active intent may decay without timely agent follow-up.'});
- if(lead.cadenceStatus==='overdue'||lead.cadenceStatus==='due')return result('cadence.sop-due',{type:'contact',label:'Restore follow-up cadence',urgency:lead.cadenceStatus==='overdue'?'Today':'This week',rationale:'The lead is due under the approved Smart List cadence.',consequence:'The lead can fall outside its required operating rhythm.'});
+ if(lead.cadenceStatus==='overdue'||lead.cadenceStatus==='due')return result('cadence.sop-due',{type:'contact',label:dueCadenceAction(lead),urgency:lead.cadenceStatus==='overdue'?'Today':'This week',rationale:'The lead is due under the approved Smart List cadence.',consequence:'The lead can fall outside its required operating rhythm.'});
  if(lead.overdueTaskCount>0)return result('task.overdue-one-off',{type:'task',label:'Clear overdue task',urgency:'Today',rationale:`${lead.overdueTaskCount} overdue one-off task(s) are visible.`,consequence:'A specifically committed action remains incomplete.'});
  if(lead.ageBand!=='Fresh'&&lead.governanceScore<55)return result('recovery.aged-low-governance',{type:'reengage',label:'Review for recovery',urgency:'This week',rationale:'The record is aged and governance is weak enough to justify a recovery decision.',consequence:'Potential pipeline and referral value remains stranded in the database.'});
  if(lead.riskLevel==='Critical'||lead.riskLevel==='High')return result('risk.management-review',{type:'broker-review',label:'Broker review',urgency:'Today',rationale:'Multiple governance failures require management judgment.',consequence:'Unresolved ownership, cadence, or disposition gaps can compound.'});
