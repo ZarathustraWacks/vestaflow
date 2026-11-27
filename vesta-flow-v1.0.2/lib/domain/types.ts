@@ -17,6 +17,7 @@ export interface NormalizedLead {
   leadLane:LeadLane; timeframeId:number|null; timeframeStatus:string|null;
   assignedUserId:number|null; assignedUserName:string; assignedUserRole:string|null;
   createdAt:string|null; updatedAt:string|null; lastActivityAt:string|null; lastCommunicationAt:string|null; lastCommunicationSource?:'fub-last-communication'|'fub-contacted'|'fub-note'|'integration-outcome'|'outbound-call'|'outbound-email'|'outbound-text'|'email'|'text'|'two-way-call'|'two-way-email'|'two-way-text'|null; brokerOutreachAt?:string|null; customerResponseAt?:string|null; twoWayEngagementAt?:string|null; nextTaskAt:string|null;
+  nextTaskName?:string|null; nextTaskOwnerId?:number|null; nextTaskPlannedAt?:string|null;
   nextAppointmentAt?:string|null; nextActionAt?:string|null; nextActionSource?:'task'|'appointment'|null; taskRepairRecommended?:boolean;
   routingManagerOwner?:boolean; routingCustody?:RoutingCustody|null; routingCustodyReason?:string|null;
   emails:string[]; phones:string[]; tags:string[]; price:number|null; collaborators:string[];

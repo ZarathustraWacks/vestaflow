@@ -1,3 +1,4 @@
+import {scheduledTaskHold,responseStillOutstanding} from '@/lib/policy/scheduled-task';
 import {dueCadenceAction} from '@/lib/policy/cadence-action';
 import {applyOperationalNextAction,currentNextAction,operationalNextActionsEnabled,NEXT_ACTION_RECEIPT} from '@/lib/next-action/operational';
 import {smartListAttention} from '@/lib/policy/smart-list-opportunities';
@@ -23,7 +24,7 @@ function priorityScore(lead:any,relationship=flowRelationshipSignals(lead)){
  const urgency=({Immediate:400,Today:300,'This week':200,Monitor:100} as Record<string,number>)[lead.decision?.urgency]||0;
  const risk=({Critical:80,High:60,Medium:30,Healthy:0} as Record<string,number>)[lead.riskLevel]||0;
  const operationalSla=lead.operationalResponseSlaStatus??lead.responseSlaStatus;
- const sla=operationalSla==='pending'?90:operationalSla==='breached'?75:0;
+ const sla=responseStillOutstanding(lead)?operationalSla==='pending'?90:operationalSla==='breached'?75:0:0;
  const cadence=lead.cadenceStatus==='overdue'?50:lead.cadenceStatus==='due'?25:0;
  const confirmation=(lead.operationalClocks||[]).some((item:any)=>item.key==='appointment-confirmation'&&['pending','breached'].includes(item.status))?110:0;
  // Cadence is also an opportunity signal: recent customer activity, a near
@@ -62,6 +63,7 @@ export function flowActionSuppressed(lead:any,events:FlowEvent[],now=Date.now())
  const pass=unresolvedPass(events);if(pass)return true;
  const nurture=events.find(event=>event.kind==='management.nurture');if(nurture&&(!nurture.returnAt||new Date(nurture.returnAt).getTime()>now))return true;
  const latest=events[0];
+ if(scheduledTaskHold(lead,now))return true;
  if(operationalNextActionsEnabled()){
   const action=currentNextAction(lead,events,now);
   if(action.plan.state==='excluded'||action.admitted&&action.held)return true;
